@@ -66,14 +66,13 @@ export default function TermsPage() {
 
           <section>
             <h2 className="font-heading text-xl font-semibold text-foreground">
-              5. Returns &amp; Refunds
+              5. Returns, Refunds &amp; Exchanges
             </h2>
             <p>
-              We offer a 30-day satisfaction guarantee. If you are not satisfied
-              with your purchase, contact us within 30 days of delivery. Products
-              must be returned in their original packaging. Refunds will be
-              processed within 7-10 business days after receiving the returned
-              product.
+              All sales are final. We do not offer refunds, exchanges, or
+              replacements on any orders. Please review your order carefully
+              before completing your purchase. Cash on Delivery (COD) is not
+              available.
             </p>
           </section>
 
@@ -110,7 +109,7 @@ export default function TermsPage() {
             <p>
               <strong>Email:</strong> hello@wellness-point.in
               <br />
-              <strong>Phone:</strong> +91 98765 43210
+              <strong>Phone:</strong> +91 87724 85312
             </p>
           </section>
         </div>

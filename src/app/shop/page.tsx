@@ -40,8 +40,8 @@ export default function ShopPage() {
 
         {/* Products Grid */}
         {loading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="space-y-4 rounded-xl border border-border bg-card p-4">
                 <Skeleton className="aspect-square w-full rounded-lg" />
                 <Skeleton className="h-5 w-3/4" />
@@ -54,7 +54,7 @@ export default function ShopPage() {
             ))}
           </div>
         ) : products.length > 0 ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {products.map((product) => (
               <ProductCard key={product._id} product={product} />
             ))}

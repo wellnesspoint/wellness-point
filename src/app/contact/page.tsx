@@ -69,13 +69,13 @@ export default function ContactPage() {
               {
                 icon: Phone,
                 title: "Phone",
-                detail: "+91 98765 43210",
+                detail: "+91 87724 85312",
                 sub: "Mon-Sat, 10 AM - 6 PM",
               },
               {
                 icon: MapPin,
                 title: "Address",
-                detail: "Mumbai, Maharashtra",
+                detail: "Bengaluru, Karnataka",
                 sub: "India",
               },
               {

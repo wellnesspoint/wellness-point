@@ -135,7 +135,7 @@ export default function ProfilePage() {
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="9876543210"
+                placeholder="8772485312"
               />
             </div>
             <div className="sm:col-span-2">

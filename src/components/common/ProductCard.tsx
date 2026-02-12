@@ -3,7 +3,8 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, ShoppingCart, Star } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Heart, ShoppingCart, Star, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -30,6 +31,7 @@ interface ProductCardProps {
 export default function ProductCard({ product, onWishlist }: ProductCardProps) {
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
+  const router = useRouter();
 
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
   const discountPercent = hasDiscount
@@ -60,15 +62,24 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
     toast.success("Added to wishlist");
   };
 
-  return (
-    <Card className="group relative overflow-hidden border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-      {/* Discount Badge */}
-      {hasDiscount && (
-        <Badge className="absolute left-3 top-3 z-10 bg-red-500 text-white">
-          -{discountPercent}%
-        </Badge>
-      )}
+  const handleBuyNow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({
+      _id: product._id,
+      name: product.name,
+      slug: product.slug,
+      price: product.price,
+      discountPrice: product.discountPrice,
+      image: product.images[0],
+      quantity: 1,
+      stock: product.stock,
+    });
+    router.push("/checkout");
+  };
 
+  return (
+    <Card className="group relative flex flex-col overflow-hidden border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       {/* Wishlist Button */}
       <button
         onClick={handleWishlist}
@@ -86,62 +97,72 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
             alt={product.name}
             fill
             className="object-contain p-6 transition-transform duration-500 group-hover:scale-110"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           />
         </div>
       </Link>
 
       {/* Content */}
-      <div className="space-y-2 p-4">
+      <div className="flex flex-1 flex-col p-4">
+        {/* Rating row */}
+        <div className="mb-2 flex items-center gap-2">
+          <Badge className="rounded-md bg-wellness-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+            {product.rating.toFixed(1)} <Star className="ml-0.5 inline h-2.5 w-2.5 fill-white" />
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {product.reviewCount} reviews
+          </span>
+        </div>
+
+        {/* Product Name */}
         <Link href={`/product/${product.slug}`}>
-          <h3 className="font-heading text-base font-semibold text-card-foreground transition-colors group-hover:text-wellness-600 dark:group-hover:text-wellness-400 line-clamp-1">
+          <h3 className="mb-2 font-heading text-sm font-semibold leading-snug text-card-foreground transition-colors group-hover:text-wellness-600 dark:group-hover:text-wellness-400 line-clamp-2">
             {product.name}
           </h3>
         </Link>
 
-        <p className="text-xs text-muted-foreground line-clamp-2">
-          {product.shortDescription}
-        </p>
-
-        {/* Rating */}
-        <div className="flex items-center gap-1">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Star
-              key={i}
-              className={`h-3.5 w-3.5 ${
-                i < Math.round(product.rating)
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "fill-muted text-muted"
-              }`}
-            />
-          ))}
-          <span className="text-xs text-muted-foreground">({product.reviewCount})</span>
-        </div>
-
-        {/* Price + Cart */}
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-wellness-600 dark:text-wellness-400">
-              {formatPrice(hasDiscount ? product.discountPrice! : product.price)}
-            </span>
-            {hasDiscount && (
+        {/* Price row */}
+        <div className="mb-3 flex flex-wrap items-baseline gap-2">
+          <span className="text-xl font-bold text-foreground">
+            {formatPrice(hasDiscount ? product.discountPrice! : product.price)}
+          </span>
+          {hasDiscount && (
+            <>
               <span className="text-sm text-muted-foreground line-through">
                 {formatPrice(product.price)}
               </span>
-            )}
-          </div>
+              <span className="text-sm font-semibold text-wellness-600 dark:text-wellness-400">
+                {discountPercent}% off
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div className="mt-auto space-y-2">
+          {/* Add to Cart – outline button */}
           <Button
-            variant="wellness"
-            size="icon"
+            variant="outline"
+            className="w-full border-wellness-600 text-wellness-700 hover:bg-wellness-50 dark:border-wellness-400 dark:text-wellness-400 dark:hover:bg-wellness-950/30"
             onClick={handleAddToCart}
             disabled={product.stock === 0}
-            className="h-9 w-9 rounded-full"
-            aria-label={`Add ${product.name} to cart`}
           >
-            <ShoppingCart className="h-4 w-4" />
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Add to Cart
+          </Button>
+
+          {/* Buy Now – solid button */}
+          <Button
+            variant="wellness"
+            className="w-full"
+            onClick={handleBuyNow}
+            disabled={product.stock === 0}
+          >
+            Buy Now
           </Button>
         </div>
       </div>
     </Card>
   );
 }
+

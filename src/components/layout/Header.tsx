@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
@@ -23,8 +23,11 @@ export default function Header() {
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const cartItemCount = useCartStore((s) => s.getItemCount());
   const openCart = useCartStore((s) => s.openCart);
+
+  useEffect(() => setMounted(true), []);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
@@ -70,7 +73,7 @@ export default function Header() {
             aria-label="Shopping cart"
           >
             <ShoppingCart className="h-5 w-5" />
-            {cartItemCount > 0 && (
+            {mounted && cartItemCount > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-wellness-600 text-[10px] font-bold text-white shadow-sm">
                 {cartItemCount}
               </span>

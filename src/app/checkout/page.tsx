@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag, CreditCard, MapPin, ArrowLeft } from "lucide-react";
+import { ShoppingBag, CreditCard, MapPin, ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -21,6 +21,7 @@ declare global {
 
 interface Address {
   fullName: string;
+  email: string;
   phone: string;
   street: string;
   city: string;
@@ -31,10 +32,11 @@ interface Address {
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { items, getSubtotal, clearCart } = useCartStore();
+  const { items, getSubtotal, clearCart, removeItem, updateQuantity } = useCartStore();
 
   const [address, setAddress] = useState<Address>({
     fullName: "",
+    email: "",
     phone: "",
     street: "",
     city: "",
@@ -82,6 +84,7 @@ export default function CheckoutPage() {
           if (defaultAddr) {
             setAddress({
               fullName: defaultAddr.fullName || "",
+              email: defaultAddr.email || session?.user?.email || "",
               phone: defaultAddr.phone || "",
               street: defaultAddr.street || "",
               city: defaultAddr.city || "",
@@ -97,6 +100,7 @@ export default function CheckoutPage() {
   const validateAddress = () => {
     if (
       !address.fullName ||
+      !address.email ||
       !address.phone ||
       !address.street ||
       !address.city ||
@@ -104,6 +108,10 @@ export default function CheckoutPage() {
       !address.pincode
     ) {
       toast.error("Please fill in all address fields");
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) {
+      toast.error("Please enter a valid email address");
       return false;
     }
     if (address.phone.length < 10) {
@@ -189,7 +197,7 @@ export default function CheckoutPage() {
         },
         prefill: {
           name: address.fullName,
-          email: session?.user?.email || "",
+          email: address.email || session?.user?.email || "",
           contact: address.phone,
         },
         theme: {
@@ -262,6 +270,7 @@ export default function CheckoutPage() {
                     onClick={() =>
                       setAddress({
                         fullName: a.fullName,
+                        email: a.email || session?.user?.email || "",
                         phone: a.phone,
                         street: a.street,
                         city: a.city,
@@ -302,13 +311,24 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div>
+                  <Label>Email ID</Label>
+                  <Input
+                    type="email"
+                    value={address.email}
+                    onChange={(e) =>
+                      setAddress({ ...address, email: e.target.value })
+                    }
+                    placeholder="you@example.com"
+                  />
+                </div>
+                <div>
                   <Label>Phone Number</Label>
                   <Input
                     value={address.phone}
                     onChange={(e) =>
                       setAddress({ ...address, phone: e.target.value })
                     }
-                    placeholder="9876543210"
+                    placeholder="8772485312"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -328,7 +348,7 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setAddress({ ...address, city: e.target.value })
                     }
-                    placeholder="Mumbai"
+                    placeholder="Bengaluru"
                   />
                 </div>
                 <div>
@@ -338,7 +358,7 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setAddress({ ...address, state: e.target.value })
                     }
-                    placeholder="Maharashtra"
+                    placeholder="Karnataka"
                   />
                 </div>
                 <div>
@@ -380,12 +400,34 @@ export default function CheckoutPage() {
                     <p className="truncate text-sm font-medium">
                       {item.name}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Qty: {item.quantity}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                        className="flex h-6 w-6 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <span className="min-w-[20px] text-center text-xs font-medium">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                        className="flex h-6 w-6 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
+                        disabled={item.quantity >= item.stock}
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => removeItem(item._id)}
+                        className="ml-1 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-red-50 hover:text-red-500"
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-sm font-semibold">
-                    ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                    ₹{((item.discountPrice || item.price) * item.quantity).toLocaleString("en-IN")}
                   </p>
                 </div>
               ))}

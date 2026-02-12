@@ -40,7 +40,7 @@ function YouTubeIcon({ className }: { className?: string }) {
 const socialLinks = [
   {
     label: "WhatsApp",
-    href: "https://wa.me/918722485312",
+    href: "https://wa.me/918772485312",
     icon: WhatsAppIcon,
     hoverColor: "hover:text-[#25D366]",
   },
@@ -89,11 +89,15 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-wellness-400" />
-                <span className="text-gray-300">+91 87224 85312</span>
+                <span className="text-gray-300">+91 87724 85312</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-wellness-400" />
+                <span className="text-gray-300">+91 93531 13908</span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-wellness-400" />
-                <span className="text-gray-300">Mumbai, India</span>
+                <span className="text-gray-300">Bengaluru, Karnataka, India</span>
               </div>
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
                 <span className="text-xs font-medium text-wellness-400">GST No: 29ACQPH3825A1ZP</span>

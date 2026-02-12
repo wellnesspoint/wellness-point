@@ -107,7 +107,7 @@ export default function AboutPage() {
               { number: "10K+", label: "Happy Customers" },
               { number: "100%", label: "Natural Ingredients" },
               { number: "3+", label: "Premium Products" },
-              { number: "30-Day", label: "Money-Back Guarantee" },
+              { number: "100%", label: "Prepaid & Secure" },
             ].map((stat, i) => (
               <div key={i}>
                 <p className="font-heading text-4xl font-bold text-white">

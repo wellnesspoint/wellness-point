@@ -14,6 +14,8 @@ import {
   X,
   Package,
   Search,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -38,7 +40,7 @@ const emptyProduct = {
   description: "",
   price: "",
   discountPrice: "",
-  images: "",
+  images: "" as string,
   ingredients: "",
   benefits: "",
   usage: "",
@@ -55,6 +57,10 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState(emptyProduct);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const fetchProducts = async () => {
     try {
@@ -75,6 +81,9 @@ export default function AdminProductsPage() {
   const handleAdd = () => {
     setForm(emptyProduct);
     setEditId(null);
+    setImageFiles([]);
+    setImagePreviews([]);
+    setExistingImages([]);
     setShowForm(true);
   };
 
@@ -84,7 +93,7 @@ export default function AdminProductsPage() {
       description: product.description,
       price: String(product.price),
       discountPrice: product.discountPrice ? String(product.discountPrice) : "",
-      images: product.images.join(", "),
+      images: "",
       ingredients: product.ingredients.join(", "),
       benefits: product.benefits.join(", "),
       usage: product.usage || "",
@@ -93,6 +102,9 @@ export default function AdminProductsPage() {
       category: product.category || "",
     });
     setEditId(product._id);
+    setImageFiles([]);
+    setImagePreviews([]);
+    setExistingImages(product.images || []);
     setShowForm(true);
   };
 
@@ -110,6 +122,33 @@ export default function AdminProductsPage() {
     }
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const totalImages = existingImages.length + imageFiles.length + files.length;
+    if (totalImages > 5) {
+      toast.error("Maximum 5 images allowed per product");
+      return;
+    }
+    setImageFiles((prev) => [...prev, ...files]);
+    // Create previews
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews((prev) => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeNewImage = (index: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.price) {
@@ -117,31 +156,58 @@ export default function AdminProductsPage() {
       return;
     }
 
-    const payload = {
-      name: form.name,
-      description: form.description,
-      price: Number(form.price),
-      discountPrice: form.discountPrice ? Number(form.discountPrice) : undefined,
-      images: form.images
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      ingredients: form.ingredients
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      benefits: form.benefits
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      usage: form.usage,
-      stock: Number(form.stock) || 0,
-      isFeatured: form.isFeatured,
-      category: form.category,
-    };
+    if (existingImages.length === 0 && imageFiles.length === 0) {
+      toast.error("Please add at least one product image");
+      return;
+    }
 
     setSaving(true);
+
     try {
+      // Upload new images if any
+      let uploadedUrls: string[] = [];
+      if (imageFiles.length > 0) {
+        setUploading(true);
+        const formData = new FormData();
+        imageFiles.forEach((file) => formData.append("files", file));
+
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          const data = await uploadRes.json();
+          throw new Error(data.error || "Failed to upload images");
+        }
+
+        const uploadData = await uploadRes.json();
+        uploadedUrls = uploadData.urls;
+        setUploading(false);
+      }
+
+      const allImages = [...existingImages, ...uploadedUrls];
+
+      const payload = {
+        name: form.name,
+        description: form.description,
+        price: Number(form.price),
+        discountPrice: form.discountPrice ? Number(form.discountPrice) : undefined,
+        images: allImages,
+        ingredients: form.ingredients
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        benefits: form.benefits
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        usage: form.usage,
+        stock: Number(form.stock) || 0,
+        isFeatured: form.isFeatured,
+        category: form.category,
+      };
+
       const url = editId
         ? `/api/admin/products/${editId}`
         : "/api/admin/products";
@@ -156,6 +222,9 @@ export default function AdminProductsPage() {
       setShowForm(false);
       setEditId(null);
       setForm(emptyProduct);
+      setImageFiles([]);
+      setImagePreviews([]);
+      setExistingImages([]);
       fetchProducts();
     } catch {
       toast.error("Failed to save product");
@@ -275,12 +344,67 @@ export default function AdminProductsPage() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <Label>Image URLs (comma separated)</Label>
-                <Input
-                  value={form.images}
-                  onChange={(e) => setForm({ ...form, images: e.target.value })}
-                  placeholder="https://... , https://..."
-                />
+                <Label>Product Images (max 5)</Label>
+                <div className="mt-2 space-y-3">
+                  {/* Existing images */}
+                  {existingImages.length > 0 && (
+                    <div className="flex flex-wrap gap-3">
+                      {existingImages.map((img, idx) => (
+                        <div key={`existing-${idx}`} className="relative group">
+                          <img
+                            src={img}
+                            alt={`Product image ${idx + 1}`}
+                            className="h-20 w-20 rounded-lg object-cover border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeExistingImage(idx)}
+                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* New image previews */}
+                  {imagePreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-3">
+                      {imagePreviews.map((preview, idx) => (
+                        <div key={`new-${idx}`} className="relative group">
+                          <img
+                            src={preview}
+                            alt={`New image ${idx + 1}`}
+                            className="h-20 w-20 rounded-lg object-cover border border-wellness-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeNewImage(idx)}
+                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload button */}
+                  {existingImages.length + imageFiles.length < 5 && (
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 p-4 text-sm text-muted-foreground hover:border-wellness-400 hover:text-wellness-600 transition-colors">
+                      <Upload className="h-5 w-5" />
+                      <span>Click to upload images ({existingImages.length + imageFiles.length}/5)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <Label>Ingredients (comma separated)</Label>
@@ -325,7 +449,9 @@ export default function AdminProductsPage() {
               <div className="sm:col-span-2">
                 <Button type="submit" variant="wellness" disabled={saving}>
                   {saving
-                    ? "Saving..."
+                    ? uploading
+                      ? "Uploading images..."
+                      : "Saving..."
                     : editId
                     ? "Update Product"
                     : "Create Product"}

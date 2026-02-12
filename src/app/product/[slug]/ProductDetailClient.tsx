@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Heart,
   ShoppingCart,
@@ -11,12 +13,17 @@ import {
   Check,
   Truck,
   ShieldCheck,
-  RotateCcw,
+  Zap,
+  Send,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useCartStore } from "@/store/cart";
 import { formatPrice, getDiscountPercentage } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -47,6 +54,29 @@ export default function ProductDetailClient({
   const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  // Reviews state
+  interface Review {
+    _id: string;
+    name: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+  }
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/reviews?productId=${product._id}`)
+      .then((r) => r.json())
+      .then((d) => setReviews(d.reviews || []))
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false));
+  }, [product._id]);
 
   const hasDiscount =
     product.discountPrice && product.discountPrice < product.price;
@@ -70,6 +100,55 @@ export default function ProductDetailClient({
     }
     toast.success(`${product.name} added to cart`);
     openCart();
+  };
+
+  const handleBuyNow = () => {
+    addItem({
+      _id: product._id,
+      name: product.name,
+      slug: product.slug,
+      price: product.price,
+      discountPrice: product.discountPrice,
+      image: product.images[0],
+      quantity: 1,
+      stock: product.stock,
+    });
+    router.push("/checkout");
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session) {
+      toast.error("Please login to submit a review");
+      router.push("/login");
+      return;
+    }
+    if (!reviewForm.comment.trim()) {
+      toast.error("Please write a comment");
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product._id,
+          rating: reviewForm.rating,
+          comment: reviewForm.comment,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to submit review");
+      }
+      toast.success("Review submitted! It will appear after admin approval.");
+      setReviewForm({ rating: 5, comment: "" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit review");
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   return (
@@ -216,6 +295,16 @@ export default function ProductDetailClient({
                 Add to Cart — {formatPrice(effectivePrice * quantity)}
               </Button>
 
+              <Button
+                size="lg"
+                className="flex-1 bg-wellness-800 text-white hover:bg-wellness-900 dark:bg-wellness-300 dark:text-wellness-950 dark:hover:bg-wellness-200"
+                onClick={handleBuyNow}
+                disabled={product.stock === 0}
+              >
+                <Zap className="mr-2 h-5 w-5" />
+                Buy Now
+              </Button>
+
               <Button variant="outline" size="icon" className="h-12 w-12 shrink-0">
                 <Heart className="h-5 w-5" />
               </Button>
@@ -236,11 +325,17 @@ export default function ProductDetailClient({
                 </span>
               </div>
               <div className="flex flex-col items-center gap-1 text-center">
-                <RotateCcw className="h-5 w-5 text-wellness-600" />
+                <ShieldCheck className="h-5 w-5 text-wellness-600" />
                 <span className="text-xs font-medium text-foreground">
-                  30-Day Returns
+                  No Refund/Exchange
                 </span>
               </div>
+            </div>
+
+            {/* Policy Notice */}
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-700 dark:text-amber-400">
+              <p className="font-semibold">Policy:</p>
+              <p>No COD • No Exchange or Replacement • No Refund</p>
             </div>
           </div>
         </div>
@@ -272,6 +367,12 @@ export default function ProductDetailClient({
                 className="rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
               >
                 How to Use
+              </TabsTrigger>
+              <TabsTrigger
+                value="reviews"
+                className="rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
+              >
+                Reviews ({product.reviewCount})
               </TabsTrigger>
             </TabsList>
 
@@ -309,6 +410,140 @@ export default function ProductDetailClient({
             <TabsContent value="usage" className="mt-6">
               <div className="rounded-lg bg-wellness-50 p-6">
                 <p className="text-foreground whitespace-pre-line">{product.usage}</p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="reviews" className="mt-6">
+              <div className="space-y-8">
+                {/* Review Summary */}
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-foreground">{product.rating.toFixed(1)}</div>
+                    <div className="flex gap-0.5 justify-center mt-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${
+                            i < Math.round(product.rating)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "fill-muted text-muted"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{product.reviewCount} reviews</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Reviews List */}
+                {reviewsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-wellness-200 border-t-wellness-600" />
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <Star className="mx-auto mb-2 h-10 w-10 text-muted" />
+                    <p className="text-muted-foreground">No reviews yet. Be the first to review!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <div key={review._id} className="rounded-lg border p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-wellness-100 text-wellness-700">
+                              <User className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{review.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(review.createdAt).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3.5 w-3.5 ${
+                                  i < review.rating
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "fill-muted text-muted"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">{review.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Write a Review */}
+                <div>
+                  <h3 className="mb-4 text-lg font-semibold text-foreground">Write a Review</h3>
+                  {session ? (
+                    <form onSubmit={handleSubmitReview} className="space-y-4">
+                      <div>
+                        <Label>Rating</Label>
+                        <div className="flex gap-1 mt-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setReviewForm({ ...reviewForm, rating: i + 1 })}
+                              className="transition-transform hover:scale-110"
+                            >
+                              <Star
+                                className={`h-7 w-7 ${
+                                  i < reviewForm.rating
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "fill-muted text-muted hover:fill-yellow-200 hover:text-yellow-200"
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Your Review</Label>
+                        <Textarea
+                          value={reviewForm.comment}
+                          onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                          placeholder="Share your experience with this product..."
+                          rows={4}
+                          className="mt-1"
+                        />
+                      </div>
+                      <Button type="submit" variant="wellness" disabled={submittingReview}>
+                        <Send className="mr-2 h-4 w-4" />
+                        {submittingReview ? "Submitting..." : "Submit Review"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="rounded-lg border border-dashed p-6 text-center">
+                      <p className="text-muted-foreground">
+                        Please{" "}
+                        <button
+                          onClick={() => router.push("/login")}
+                          className="font-medium text-wellness-600 underline hover:text-wellness-700"
+                        >
+                          log in
+                        </button>{" "}
+                        to write a review.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </TabsContent>
           </Tabs>

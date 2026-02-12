@@ -41,6 +41,7 @@ async function seed() {
           slug: "organic-ashwagandha-capsules",
           description:
             "Premium organic Ashwagandha (Withania somnifera) capsules for stress relief, improved energy levels, and enhanced cognitive function. Made from highest quality KSM-66 root extract.",
+          shortDescription: "KSM-66 Ashwagandha for stress relief, energy & cognitive support.",
           price: 899,
           discountPrice: 699,
           images: [
@@ -56,6 +57,7 @@ async function seed() {
           usage: "Take 1 capsule twice daily with water after meals.",
           stock: 150,
           isFeatured: true,
+          isActive: true,
           category: "Herbs",
           rating: 4.7,
           reviewCount: 234,
@@ -69,6 +71,7 @@ async function seed() {
           slug: "whey-protein-isolate-chocolate",
           description:
             "Ultra-pure Whey Protein Isolate with 27g protein per serving. Zero added sugar, fast absorbing, and perfect for post-workout recovery. Rich chocolate flavor.",
+          shortDescription: "27g protein per scoop, zero sugar, rich chocolate flavor.",
           price: 2499,
           discountPrice: 1999,
           images: [
@@ -84,6 +87,7 @@ async function seed() {
           usage: "Mix 1 scoop (30g) with 200ml cold water or milk. Shake well.",
           stock: 80,
           isFeatured: true,
+          isActive: true,
           category: "Protein",
           rating: 4.8,
           reviewCount: 512,
@@ -97,6 +101,7 @@ async function seed() {
           slug: "omega-3-fish-oil-softgels",
           description:
             "Triple strength Omega-3 fish oil softgels with 1000mg EPA & DHA per serving. Sourced from deep-sea wild-caught fish, molecularly distilled for purity.",
+          shortDescription: "Triple strength EPA & DHA from wild-caught fish.",
           price: 1199,
           discountPrice: 949,
           images: [
@@ -112,6 +117,7 @@ async function seed() {
           usage: "Take 2 softgels daily with meals.",
           stock: 200,
           isFeatured: true,
+          isActive: true,
           category: "Vitamins",
           rating: 4.5,
           reviewCount: 178,
@@ -125,6 +131,7 @@ async function seed() {
           slug: "multivitamin-daily-tablets",
           description:
             "Complete daily multivitamin with 23 essential vitamins and minerals. Includes Vitamin D3, B12, Iron, Zinc, and antioxidants for overall health and wellness.",
+          shortDescription: "23 essential vitamins & minerals for daily wellness.",
           price: 599,
           discountPrice: 499,
           images: [
@@ -140,6 +147,7 @@ async function seed() {
           usage: "Take 1 tablet daily with breakfast.",
           stock: 300,
           isFeatured: true,
+          isActive: true,
           category: "Vitamins",
           rating: 4.6,
           reviewCount: 392,
@@ -153,6 +161,7 @@ async function seed() {
           slug: "plant-based-collagen-builder",
           description:
             "Vegan collagen-boosting formula with Vitamin C, Hyaluronic Acid, and Bamboo Silica. Supports skin elasticity, hair strength, and joint health naturally.",
+          shortDescription: "Vegan collagen booster for skin, hair & joints.",
           price: 1399,
           images: [
             "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=600",
@@ -167,6 +176,7 @@ async function seed() {
           usage: "Take 2 capsules daily with water.",
           stock: 120,
           isFeatured: false,
+          isActive: true,
           category: "Beauty",
           rating: 4.4,
           reviewCount: 98,
@@ -180,6 +190,7 @@ async function seed() {
           slug: "probiotic-50-billion-cfu",
           description:
             "Advanced probiotic supplement with 16 strains and 50 billion CFU per capsule. Supports digestive health, immune function, and gut-brain connection.",
+          shortDescription: "16-strain probiotic with 50 billion CFU per capsule.",
           price: 1599,
           discountPrice: 1299,
           images: [
@@ -195,6 +206,7 @@ async function seed() {
           usage: "Take 1 capsule daily on an empty stomach.",
           stock: 90,
           isFeatured: false,
+          isActive: true,
           category: "Gut Health",
           rating: 4.3,
           reviewCount: 145,

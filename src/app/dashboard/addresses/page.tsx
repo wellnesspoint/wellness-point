@@ -178,7 +178,7 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, phone: e.target.value })
                   }
-                  placeholder="9876543210"
+                  placeholder="8772485312"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -198,7 +198,7 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, city: e.target.value })
                   }
-                  placeholder="Mumbai"
+                  placeholder="Bengaluru"
                 />
               </div>
               <div>
@@ -208,7 +208,7 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, state: e.target.value })
                   }
-                  placeholder="Maharashtra"
+                  placeholder="Karnataka"
                 />
               </div>
               <div>

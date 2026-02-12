@@ -37,6 +37,9 @@ export const FOOTER_LINKS = {
   legal: [
     { label: "Privacy Policy", href: "/privacy-policy" },
     { label: "Terms & Conditions", href: "/terms" },
+    { label: "Returns & Refund Policy", href: "/returns-refund-policy" },
+    { label: "Shipping Policy", href: "/shipping-policy" },
+    { label: "Disclaimer", href: "/disclaimer" },
   ],
   account: [
     { label: "My Account", href: "/dashboard" },
@@ -87,7 +90,7 @@ export const FAQ_DATA = [
   {
     question: "What is your return and refund policy?",
     answer:
-      "We offer a 30-day satisfaction guarantee. If you're not happy with your purchase, contact us within 30 days of delivery for a full refund or exchange.",
+      "All sales are final. We do not offer refunds, exchanges, or replacements on any orders. Please review your order carefully before completing your purchase. Cash on Delivery (COD) is not available — all orders must be prepaid online.",
   },
   {
     question: "Do you offer international shipping?",
