@@ -63,7 +63,7 @@ export default function ContactPage() {
               {
                 icon: Mail,
                 title: "Email",
-                detail: "hello@wellness-point.in",
+                detail: "support@wellness-point.in",
                 sub: "We reply within 24 hours",
               },
               {

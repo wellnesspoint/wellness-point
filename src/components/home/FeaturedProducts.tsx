@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductCard from "@/components/common/ProductCard";
@@ -24,6 +24,48 @@ export default function FeaturedProducts() {
     }
     fetchProducts();
   }, []);
+
+  // Infinite loop: render 3 copies and keep scroll centered on the middle copy
+  const tripled = products.length > 0 ? [...products, ...products, ...products] : [];
+
+  const resetScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || products.length === 0) return;
+    // Each product card is ~280px + 24px gap = ~304px
+    const singleSetWidth = el.scrollWidth / 3;
+    // If scrolled past the end of the middle copy, jump back
+    if (el.scrollLeft >= singleSetWidth * 2) {
+      el.scrollLeft -= singleSetWidth;
+    }
+    // If scrolled before the start of the middle copy, jump forward
+    if (el.scrollLeft <= 0) {
+      el.scrollLeft += singleSetWidth;
+    }
+  }, [products.length]);
+
+  // On mount / products load, start scroll at the middle copy
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || products.length === 0) return;
+    const singleSetWidth = el.scrollWidth / 3;
+    el.scrollLeft = singleSetWidth;
+  }, [products]);
+
+  // Listen for scroll end to silently reset position
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let timeout: ReturnType<typeof setTimeout>;
+    const handleScroll = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(resetScroll, 60);
+    };
+    el.addEventListener("scroll", handleScroll);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      clearTimeout(timeout);
+    };
+  }, [resetScroll]);
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
@@ -92,8 +134,8 @@ export default function FeaturedProducts() {
             className="flex gap-6 overflow-x-auto px-12 pb-4 scrollbar-hide sm:px-16"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
-            {products.map((product) => (
-              <div key={product._id} className="w-[260px] flex-shrink-0 sm:w-[280px]">
+            {tripled.map((product, idx) => (
+              <div key={`${product._id}-${idx}`} className="w-[260px] flex-shrink-0 sm:w-[280px]">
                 <ProductCard product={product} />
               </div>
             ))}

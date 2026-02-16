@@ -76,10 +76,10 @@ export default function ShippingPolicyPage() {
               If your order has not been delivered within the estimated delivery
               window, please contact our support team at{" "}
               <a
-                href="mailto:hello@wellness-point.in"
+                href="mailto:support@wellness-point.in"
                 className="text-wellness-600 hover:underline"
               >
-                hello@wellness-point.in
+                support@wellness-point.in
               </a>{" "}
               or call us at{" "}
               <a
@@ -120,10 +120,10 @@ export default function ShippingPolicyPage() {
               <li>
                 Email:{" "}
                 <a
-                  href="mailto:hello@wellness-point.in"
+                  href="mailto:support@wellness-point.in"
                   className="text-wellness-600 hover:underline"
                 >
-                  hello@wellness-point.in
+                  support@wellness-point.in
                 </a>
               </li>
               <li>

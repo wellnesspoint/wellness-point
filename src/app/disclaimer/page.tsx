@@ -134,10 +134,10 @@ export default function DisclaimerPage() {
               <li>
                 Email:{" "}
                 <a
-                  href="mailto:hello@wellness-point.in"
+                  href="mailto:support@wellness-point.in"
                   className="text-wellness-600 hover:underline"
                 >
-                  hello@wellness-point.in
+                  support@wellness-point.in
                 </a>
               </li>
               <li>

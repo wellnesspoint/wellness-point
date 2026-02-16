@@ -87,7 +87,7 @@ export default function PrivacyPolicyPage() {
             <p>
               You have the right to access, correct, or delete your personal
               data. You can also opt out of marketing communications at any
-              time. Contact us at hello@wellness-point.in for any privacy-related
+              time. Contact us at support@wellness-point.in for any privacy-related
               requests.
             </p>
           </section>
@@ -101,7 +101,7 @@ export default function PrivacyPolicyPage() {
               at:
             </p>
             <p>
-              <strong>Email:</strong> hello@wellness-point.in
+              <strong>Email:</strong> support@wellness-point.in
               <br />
               <strong>Phone:</strong> +91 87724 85312
             </p>

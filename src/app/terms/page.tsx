@@ -107,7 +107,7 @@ export default function TermsPage() {
               For questions about these Terms &amp; Conditions, contact us at:
             </p>
             <p>
-              <strong>Email:</strong> hello@wellness-point.in
+              <strong>Email:</strong> support@wellness-point.in
               <br />
               <strong>Phone:</strong> +91 87724 85312
             </p>
