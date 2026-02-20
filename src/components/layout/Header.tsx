@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import {
   Menu,
@@ -34,9 +35,14 @@ export default function Header() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-wellness-500 to-wellness-700 shadow-md">
-            <span className="text-lg font-bold text-white">W</span>
-          </div>
+          <Image
+            src="/logo.png"
+            alt="Wellness Point"
+            width={44}
+            height={44}
+            className="h-11 w-11 object-contain"
+            priority
+          />
           <span className="font-heading text-xl font-bold text-foreground">
             Wellness Point
           </span>

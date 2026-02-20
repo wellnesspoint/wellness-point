@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Mail, Phone, MapPin } from "lucide-react";
 import { FOOTER_LINKS, SITE_CONFIG } from "@/lib/constants";
 import { Separator } from "@/components/ui/separator";
@@ -40,7 +41,7 @@ function YouTubeIcon({ className }: { className?: string }) {
 const socialLinks = [
   {
     label: "WhatsApp",
-    href: "https://wa.me/918772485312",
+    href: "https://wa.me/918722485312",
     icon: WhatsAppIcon,
     hoverColor: "hover:text-[#25D366]",
   },
@@ -72,9 +73,13 @@ export default function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-wellness-400 to-wellness-600 shadow-md">
-                <span className="text-lg font-bold text-white">W</span>
-              </div>
+              <Image
+                src="/logo.png"
+                alt="Wellness Point"
+                width={44}
+                height={44}
+                className="h-11 w-11 object-contain"
+              />
               <span className="font-heading text-xl font-bold text-white dark:text-foreground">
                 Wellness Point
               </span>
@@ -89,7 +94,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-wellness-400" />
-                <span className="text-gray-300">+91 87724 85312</span>
+                <span className="text-gray-300">+91 87224 85312</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-wellness-400" />

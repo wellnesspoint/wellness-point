@@ -69,7 +69,7 @@ export default function ContactPage() {
               {
                 icon: Phone,
                 title: "Phone",
-                detail: "+91 87724 85312",
+                detail: "+91 87224 85312",
                 sub: "Mon-Sat, 10 AM - 6 PM",
               },
               {

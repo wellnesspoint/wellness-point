@@ -178,7 +178,7 @@ export default function AddressesPage() {
                   onChange={(e) =>
                     setForm({ ...form, phone: e.target.value })
                   }
-                  placeholder="8772485312"
+                  placeholder="8722485312"
                 />
               </div>
               <div className="sm:col-span-2">

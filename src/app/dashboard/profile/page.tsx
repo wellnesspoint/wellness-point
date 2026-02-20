@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [provider, setProvider] = useState<string>("credentials");
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState("");
@@ -32,6 +33,7 @@ export default function ProfilePage() {
           setName(d.user.name || "");
           setPhone(d.user.phone || "");
           setEmail(d.user.email || "");
+          setProvider(d.user.provider || "credentials");
         }
       })
       .catch(() => {})
@@ -135,7 +137,7 @@ export default function ProfilePage() {
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="8772485312"
+                placeholder="Enter your phone number"
               />
             </div>
             <div className="sm:col-span-2">
@@ -143,7 +145,6 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">{email}</span>
-                <span className="text-xs text-muted-foreground">(cannot be changed)</span>
               </div>
             </div>
             <div className="sm:col-span-2">
@@ -159,8 +160,8 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Change Password */}
-      {session?.user && (
+      {/* Change Password — only for credentials (email/password) users */}
+      {session?.user && provider === "credentials" && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">

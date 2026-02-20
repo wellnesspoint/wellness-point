@@ -24,6 +24,7 @@ interface Address {
   email: string;
   phone: string;
   street: string;
+  addressLine2: string;
   city: string;
   state: string;
   pincode: string;
@@ -39,6 +40,7 @@ export default function CheckoutPage() {
     email: "",
     phone: "",
     street: "",
+    addressLine2: "",
     city: "",
     state: "",
     pincode: "",
@@ -72,25 +74,35 @@ export default function CheckoutPage() {
     document.body.appendChild(script);
   }, []);
 
-  // Load saved addresses
+  // Load saved addresses & profile data
   useEffect(() => {
     if (session) {
       fetch("/api/user/profile")
         .then((r) => r.json())
         .then((d) => {
-          const addrs = d.user?.addresses || [];
+          const user = d.user || {};
+          const addrs = user.addresses || [];
           setSavedAddresses(addrs);
           const defaultAddr = addrs.find((a: any) => a.isDefault) || addrs[0];
           if (defaultAddr) {
             setAddress({
-              fullName: defaultAddr.fullName || "",
-              email: defaultAddr.email || session?.user?.email || "",
-              phone: defaultAddr.phone || "",
+              fullName: defaultAddr.fullName || user.name || "",
+              email: defaultAddr.email || user.email || session?.user?.email || "",
+              phone: defaultAddr.phone || user.phone || "",
               street: defaultAddr.street || "",
+              addressLine2: defaultAddr.addressLine2 || "",
               city: defaultAddr.city || "",
               state: defaultAddr.state || "",
               pincode: defaultAddr.pincode || "",
             });
+          } else {
+            // No saved address — prefill from profile
+            setAddress((prev) => ({
+              ...prev,
+              fullName: user.name || "",
+              email: user.email || session?.user?.email || "",
+              phone: user.phone || "",
+            }));
           }
         })
         .catch(() => {});
@@ -116,6 +128,10 @@ export default function CheckoutPage() {
     }
     if (address.phone.length < 10) {
       toast.error("Please enter a valid phone number");
+      return false;
+    }
+    if (!/^\d{6}$/.test(address.pincode)) {
+      toast.error("Pincode must be exactly 6 digits");
       return false;
     }
     return true;
@@ -273,6 +289,7 @@ export default function CheckoutPage() {
                         email: a.email || session?.user?.email || "",
                         phone: a.phone,
                         street: a.street,
+                        addressLine2: (a as any).addressLine2 || "",
                         city: a.city,
                         state: a.state,
                         pincode: a.pincode,
@@ -307,7 +324,7 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setAddress({ ...address, fullName: e.target.value })
                     }
-                    placeholder="John Doe"
+                    placeholder="Enter your full name"
                   />
                 </div>
                 <div>
@@ -318,7 +335,7 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setAddress({ ...address, email: e.target.value })
                     }
-                    placeholder="you@example.com"
+                    placeholder="Enter your email address"
                   />
                 </div>
                 <div>
@@ -328,17 +345,27 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setAddress({ ...address, phone: e.target.value })
                     }
-                    placeholder="8772485312"
+                    placeholder="Enter your phone number"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label>Street Address</Label>
+                  <Label>Address Line 1</Label>
                   <Input
                     value={address.street}
                     onChange={(e) =>
                       setAddress({ ...address, street: e.target.value })
                     }
-                    placeholder="123, MG Road, Apt 4B"
+                    placeholder="Enter your address"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Address Line 2 <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                  <Input
+                    value={address.addressLine2}
+                    onChange={(e) =>
+                      setAddress({ ...address, addressLine2: e.target.value })
+                    }
+                    placeholder="Apartment, suite, landmark, etc."
                   />
                 </div>
                 <div>
@@ -348,7 +375,7 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setAddress({ ...address, city: e.target.value })
                     }
-                    placeholder="Bengaluru"
+                    placeholder="Enter your city"
                   />
                 </div>
                 <div>
@@ -358,17 +385,20 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setAddress({ ...address, state: e.target.value })
                     }
-                    placeholder="Karnataka"
+                    placeholder="Enter your state"
                   />
                 </div>
                 <div>
                   <Label>Pincode</Label>
                   <Input
                     value={address.pincode}
-                    onChange={(e) =>
-                      setAddress({ ...address, pincode: e.target.value })
-                    }
-                    placeholder="400001"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      setAddress({ ...address, pincode: val });
+                    }}
+                    placeholder="Enter your pincode"
+                    maxLength={6}
+                    inputMode="numeric"
                   />
                 </div>
               </div>
@@ -468,7 +498,7 @@ export default function CheckoutPage() {
                 className="w-full"
                 size="lg"
                 onClick={handlePayment}
-                disabled={processing}
+                disabled={processing || !address.fullName.trim() || !address.email.trim() || !address.phone.trim() || !address.street.trim() || !address.city.trim() || !address.state.trim() || !/^\d{6}$/.test(address.pincode)}
               >
                 <CreditCard className="mr-2 h-5 w-5" />
                 {processing ? "Processing..." : `Pay ₹${total.toLocaleString("en-IN")}`}

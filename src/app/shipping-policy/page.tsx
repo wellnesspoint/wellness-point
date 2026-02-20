@@ -83,10 +83,10 @@ export default function ShippingPolicyPage() {
               </a>{" "}
               or call us at{" "}
               <a
-                href="tel:+918772485312"
+                href="tel:+918722485312"
                 className="text-wellness-600 hover:underline"
               >
-                +91 87724 85312
+                +91 87224 85312
               </a>
               . We will investigate the matter and ensure timely resolution.
             </p>
@@ -129,10 +129,10 @@ export default function ShippingPolicyPage() {
               <li>
                 Phone:{" "}
                 <a
-                  href="tel:+918772485312"
+                  href="tel:+918722485312"
                   className="text-wellness-600 hover:underline"
                 >
-                  +91 87724 85312
+                  +91 87224 85312
                 </a>
               </li>
               <li>Address: Bengaluru, Karnataka, India</li>

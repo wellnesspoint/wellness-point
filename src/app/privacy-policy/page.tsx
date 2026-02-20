@@ -103,7 +103,7 @@ export default function PrivacyPolicyPage() {
             <p>
               <strong>Email:</strong> support@wellness-point.in
               <br />
-              <strong>Phone:</strong> +91 87724 85312
+              <strong>Phone:</strong> +91 87224 85312
             </p>
           </section>
         </div>

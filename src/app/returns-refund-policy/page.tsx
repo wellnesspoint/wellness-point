@@ -138,10 +138,10 @@ export default function ReturnsRefundPolicyPage() {
               <li>
                 Phone:{" "}
                 <a
-                  href="tel:+918772485312"
+                  href="tel:+918722485312"
                   className="text-wellness-600 hover:underline"
                 >
-                  +91 87724 85312
+                  +91 87224 85312
                 </a>
               </li>
               <li>Address: Bengaluru, Karnataka, India</li>
