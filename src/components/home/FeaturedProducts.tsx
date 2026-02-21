@@ -68,9 +68,22 @@ export default function FeaturedProducts() {
   }, [resetScroll]);
 
   const scroll = (direction: "left" | "right") => {
-    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    if (!el || products.length === 0) return;
+
+    const singleSetWidth = el.scrollWidth / 3;
     const scrollAmount = 300;
-    scrollRef.current.scrollBy({
+    const maxScroll = el.scrollWidth - el.clientWidth;
+
+    // Pre-reposition: if we're about to hit the physical edge,
+    // instantly jump to the identical position in the middle copy first
+    if (direction === "left" && el.scrollLeft <= scrollAmount) {
+      el.scrollLeft += singleSetWidth;
+    } else if (direction === "right" && el.scrollLeft >= maxScroll - scrollAmount) {
+      el.scrollLeft -= singleSetWidth;
+    }
+
+    el.scrollBy({
       left: direction === "left" ? -scrollAmount : scrollAmount,
       behavior: "smooth",
     });

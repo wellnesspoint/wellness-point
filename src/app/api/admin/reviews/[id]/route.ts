@@ -17,6 +17,11 @@ export async function PUT(req: NextRequest, { params }: Props) {
     const { id } = await params;
     const body = await req.json();
 
+    // Auto-set adminRepliedAt when adminReply is provided
+    if (body.adminReply) {
+      body.adminRepliedAt = new Date();
+    }
+
     await connectDB();
     const review = await Review.findByIdAndUpdate(id, body, { new: true });
 

@@ -12,7 +12,10 @@ import {
   Trash2,
   MessageSquare,
   Search,
+  Reply,
+  Send,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
 
 interface Review {
@@ -24,6 +27,8 @@ interface Review {
   title: string;
   content: string;
   isApproved: boolean;
+  adminReply?: string;
+  adminRepliedAt?: string;
   createdAt: string;
 }
 
@@ -32,6 +37,8 @@ export default function AdminReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "approved">("all");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   const fetchReviews = async () => {
     try {
@@ -94,6 +101,33 @@ export default function AdminReviewsPage() {
       toast.success("Review deleted");
     } catch {
       toast.error("Failed to delete");
+    }
+  };
+
+  const handleReply = async (id: string) => {
+    if (!replyText.trim()) {
+      toast.error("Reply cannot be empty");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/reviews/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminReply: replyText.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setReviews((prev) =>
+        prev.map((r) =>
+          r._id === id
+            ? { ...r, adminReply: replyText.trim(), adminRepliedAt: new Date().toISOString() }
+            : r
+        )
+      );
+      setReplyingTo(null);
+      setReplyText("");
+      toast.success("Reply posted");
+    } catch {
+      toast.error("Failed to post reply");
     }
   };
 
@@ -229,8 +263,47 @@ export default function AdminReviewsPage() {
                         year: "numeric",
                       })}
                     </p>
+
+                    {/* Admin Reply */}
+                    {review.adminReply && (
+                      <div className="mt-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 p-3 border-l-2 border-emerald-500">
+                        <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">
+                          Admin Reply
+                        </p>
+                        <p className="text-sm text-foreground">{review.adminReply}</p>
+                      </div>
+                    )}
+
+                    {/* Reply Form */}
+                    {replyingTo === review._id && (
+                      <div className="mt-2 space-y-2">
+                        <Textarea
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder="Write your reply..."
+                          rows={2}
+                          className="text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="wellness"
+                            onClick={() => handleReply(review._id)}
+                          >
+                            <Send className="mr-1 h-3 w-3" /> Send Reply
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => { setReplyingTo(null); setReplyText(""); }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-1 shrink-0">
+                  <div className="flex flex-col gap-1 shrink-0">
                     {!review.isApproved && (
                       <button
                         onClick={() => handleApprove(review._id)}
@@ -249,6 +322,16 @@ export default function AdminReviewsPage() {
                         <X className="h-4 w-4" />
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        setReplyingTo(review._id);
+                        setReplyText(review.adminReply || "");
+                      }}
+                      className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
+                      title="Reply"
+                    >
+                      <Reply className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => handleDelete(review._id)}
                       className="rounded-lg p-2 text-muted-foreground hover:bg-red-50 hover:text-red-500"

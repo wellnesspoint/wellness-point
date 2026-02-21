@@ -12,6 +12,10 @@ export interface IProduct extends Document {
   benefits: string[];
   usage: string;
   stock: number;
+  sku?: string;
+  weight?: number;
+  gst?: number;
+  category?: string;
   isFeatured: boolean;
   isActive: boolean;
   rating: number;
@@ -35,6 +39,10 @@ const productSchema = new Schema<IProduct>(
     benefits: [{ type: String }],
     usage: { type: String },
     stock: { type: Number, required: true, default: 0, min: 0 },
+    sku: { type: String, trim: true },
+    weight: { type: Number, min: 0 },
+    gst: { type: Number, min: 0, max: 100, default: 18 },
+    category: { type: String, trim: true },
     isFeatured: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     rating: { type: Number, default: 0, min: 0, max: 5 },

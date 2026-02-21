@@ -16,6 +16,9 @@ import {
   Search,
   Upload,
   ImageIcon,
+  Eye,
+  EyeOff,
+  AlertTriangle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -31,7 +34,11 @@ interface Product {
   benefits: string[];
   usage: string;
   stock: number;
+  sku?: string;
+  weight?: number;
+  gst?: number;
   isFeatured: boolean;
+  isActive: boolean;
   category?: string;
 }
 
@@ -45,7 +52,11 @@ const emptyProduct = {
   benefits: "",
   usage: "",
   stock: "",
+  sku: "",
+  weight: "",
+  gst: "18",
   isFeatured: false,
+  isActive: true,
   category: "",
 };
 
@@ -98,7 +109,11 @@ export default function AdminProductsPage() {
       benefits: product.benefits.join(", "),
       usage: product.usage || "",
       stock: String(product.stock),
+      sku: product.sku || "",
+      weight: product.weight ? String(product.weight) : "",
+      gst: product.gst !== undefined ? String(product.gst) : "18",
       isFeatured: product.isFeatured,
+      isActive: product.isActive !== false,
       category: product.category || "",
     });
     setEditId(product._id);
@@ -204,7 +219,11 @@ export default function AdminProductsPage() {
           .filter(Boolean),
         usage: form.usage,
         stock: Number(form.stock) || 0,
+        sku: form.sku || undefined,
+        weight: form.weight ? Number(form.weight) : undefined,
+        gst: form.gst ? Number(form.gst) : 18,
         isFeatured: form.isFeatured,
+        isActive: form.isActive,
         category: form.category,
       };
 
@@ -343,6 +362,32 @@ export default function AdminProductsPage() {
                   placeholder="e.g. Vitamins, Protein"
                 />
               </div>
+              <div>
+                <Label>SKU</Label>
+                <Input
+                  value={form.sku}
+                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                  placeholder="e.g. WP-VIT-001"
+                />
+              </div>
+              <div>
+                <Label>Weight (grams)</Label>
+                <Input
+                  type="number"
+                  value={form.weight}
+                  onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                  placeholder="e.g. 500"
+                />
+              </div>
+              <div>
+                <Label>GST / Tax (%)</Label>
+                <Input
+                  type="number"
+                  value={form.gst}
+                  onChange={(e) => setForm({ ...form, gst: e.target.value })}
+                  placeholder="18"
+                />
+              </div>
               <div className="sm:col-span-2">
                 <Label>Product Images (max 5)</Label>
                 <div className="mt-2 space-y-3">
@@ -446,6 +491,20 @@ export default function AdminProductsPage() {
                   Featured Product
                 </Label>
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={form.isActive}
+                  onChange={(e) =>
+                    setForm({ ...form, isActive: e.target.checked })
+                  }
+                  className="h-4 w-4 rounded"
+                />
+                <Label htmlFor="isActive" className="mb-0 cursor-pointer">
+                  Active (visible in store)
+                </Label>
+              </div>
               <div className="sm:col-span-2">
                 <Button type="submit" variant="wellness" disabled={saving}>
                   {saving
@@ -503,12 +562,17 @@ export default function AdminProductsPage() {
                         ₹{product.discountPrice}
                       </span>
                     )}
-                    <span className="text-xs text-muted-foreground">
-                      Stock: {product.stock}
+                    <span className={`text-xs ${product.stock <= 10 ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                      {product.stock <= 0 ? "Out of Stock" : product.stock <= 10 ? `Low: ${product.stock}` : `Stock: ${product.stock}`}
                     </span>
                     {product.isFeatured && (
                       <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
                         Featured
+                      </span>
+                    )}
+                    {product.isActive === false && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
+                        Disabled
                       </span>
                     )}
                   </div>

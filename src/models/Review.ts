@@ -9,6 +9,8 @@ export interface IReview extends Document {
   title: string;
   content: string;
   isApproved: boolean;
+  adminReply?: string;
+  adminRepliedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +30,8 @@ const reviewSchema = new Schema<IReview>(
     title: { type: String, required: true, trim: true, maxlength: 120 },
     content: { type: String, required: true, trim: true, maxlength: 1000 },
     isApproved: { type: Boolean, default: false },
+    adminReply: { type: String, trim: true, maxlength: 1000 },
+    adminRepliedAt: { type: Date },
   },
   {
     timestamps: true,
