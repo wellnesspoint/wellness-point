@@ -53,7 +53,7 @@ const socialLinks = [
   },
   {
     label: "Facebook",
-    href: "#",
+    href: "https://facebook.com/wellnesspoint.in",
     icon: FacebookIcon,
     hoverColor: "hover:text-[#1877F2]",
   },
