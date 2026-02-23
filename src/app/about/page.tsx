@@ -15,7 +15,7 @@ export default function AboutPage() {
       {/* Hero */}
       <section className="py-20 text-center">
         <div className="container mx-auto px-4">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Our Story
           </span>
           <h1 className="mt-2 font-heading text-4xl font-bold text-foreground sm:text-5xl">
@@ -86,7 +86,7 @@ export default function AboutPage() {
                 key={i}
                 className="rounded-2xl bg-card p-6 text-center shadow-sm transition-shadow hover:shadow-md border border-border"
               >
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-wellness-100 dark:bg-wellness-900/50 text-wellness-600 dark:text-wellness-400">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-wellness-100 text-wellness-600">
                   <value.icon className="h-7 w-7" />
                 </div>
                 <h3 className="mb-2 font-heading text-lg font-semibold text-card-foreground">
@@ -100,7 +100,7 @@ export default function AboutPage() {
       </section>
 
       {/* Stats */}
-      <section className="bg-wellness-600 dark:bg-wellness-800 py-16">
+      <section className="bg-wellness-600 py-16">
         <div className="container mx-auto px-4">
           <div className="grid gap-8 text-center sm:grid-cols-2 lg:grid-cols-4">
             {[

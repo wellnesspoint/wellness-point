@@ -45,7 +45,7 @@ export default function ContactPage() {
     <div className="gradient-wellness py-16">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Get in Touch
           </span>
           <h1 className="mt-2 font-heading text-4xl font-bold text-foreground">
@@ -87,7 +87,7 @@ export default function ContactPage() {
             ].map((info, i) => (
               <Card key={i} className="border-0 shadow-sm">
                 <CardContent className="flex items-start gap-4 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wellness-100 dark:bg-wellness-900/50 text-wellness-600 dark:text-wellness-400">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wellness-100 text-wellness-600">
                     <info.icon className="h-5 w-5" />
                   </div>
                   <div>

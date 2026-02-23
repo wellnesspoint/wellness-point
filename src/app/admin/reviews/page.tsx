@@ -266,8 +266,8 @@ export default function AdminReviewsPage() {
 
                     {/* Admin Reply */}
                     {review.adminReply && (
-                      <div className="mt-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 p-3 border-l-2 border-emerald-500">
-                        <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">
+                      <div className="mt-2 rounded-lg bg-emerald-50 p-3 border-l-2 border-emerald-500">
+                        <p className="text-xs font-semibold text-emerald-700 mb-0.5">
                           Admin Reply
                         </p>
                         <p className="text-sm text-foreground">{review.adminReply}</p>

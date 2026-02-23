@@ -68,7 +68,7 @@ export default function AdminLayout({
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
           <p className="text-sm text-muted-foreground">Loading admin panel...</p>
@@ -108,8 +108,8 @@ export default function AdminLayout({
             {/* Admin branding */}
             <div className="border-b border-border p-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-                  <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">Admin Panel</p>
@@ -129,7 +129,7 @@ export default function AdminLayout({
                     onClick={() => setSidebarOpen(false)}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                       active
-                        ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                        ? "bg-emerald-50 text-emerald-700"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
@@ -151,7 +151,7 @@ export default function AdminLayout({
               </Link>
               <button
                 onClick={() => signOut({ callbackUrl: "/admin/login" })}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
                 Sign Out

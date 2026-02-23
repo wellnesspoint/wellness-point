@@ -91,7 +91,7 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
 
       {/* Image */}
       <Link href={`/product/${product.slug}`}>
-        <div className="relative aspect-square overflow-hidden bg-gradient-to-b from-wellness-50 to-white dark:from-wellness-950/50 dark:to-card">
+        <div className="relative aspect-square overflow-hidden bg-gradient-to-b from-wellness-50 to-white">
           <Image
             src={product.images[0]}
             alt={product.name}
@@ -116,7 +116,7 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
 
         {/* Product Name */}
         <Link href={`/product/${product.slug}`}>
-          <h3 className="mb-2 font-heading text-sm font-semibold leading-snug text-card-foreground transition-colors group-hover:text-wellness-600 dark:group-hover:text-wellness-400 line-clamp-2">
+          <h3 className="mb-2 font-heading text-sm font-semibold leading-snug text-card-foreground transition-colors group-hover:text-wellness-600 line-clamp-2">
             {product.name}
           </h3>
         </Link>
@@ -131,7 +131,7 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
               <span className="text-sm text-muted-foreground line-through">
                 {formatPrice(product.price)}
               </span>
-              <span className="text-sm font-semibold text-wellness-600 dark:text-wellness-400">
+              <span className="text-sm font-semibold text-wellness-600">
                 {discountPercent}% off
               </span>
             </>
@@ -143,7 +143,7 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
           {/* Add to Cart – outline button */}
           <Button
             variant="outline"
-            className="w-full border-wellness-600 text-wellness-700 hover:bg-wellness-50 dark:border-wellness-400 dark:text-wellness-400 dark:hover:bg-wellness-950/30"
+            className="w-full border-wellness-600 text-wellness-700 hover:bg-wellness-50"
             onClick={handleAddToCart}
             disabled={product.stock === 0}
           >

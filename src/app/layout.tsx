@@ -62,12 +62,7 @@ export default function RootLayout({
       <head>
         <meta name="msapplication-TileColor" content="#ffffff" />
         <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />
-        <meta name="theme-color" content="#0f766e" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})()`,
-          }}
-        />
+        <meta name="theme-color" content="#358e53" />
       </head>
       <body className="min-h-screen font-sans">
         <Providers>{children}</Providers>

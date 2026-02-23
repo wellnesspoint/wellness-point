@@ -37,7 +37,7 @@ export default function HowItWorksSection() {
     <section className="py-20">
       <div className="container mx-auto px-4">
         <div className="mb-14 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Simple Process
           </span>
           <h2 className="mt-2 font-heading text-3xl font-bold text-foreground sm:text-4xl">
@@ -51,16 +51,16 @@ export default function HowItWorksSection() {
 
         <div className="relative grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Connecting line (hidden on mobile) */}
-          <div className="absolute left-0 right-0 top-16 hidden h-0.5 bg-gradient-to-r from-transparent via-wellness-200 to-transparent dark:via-wellness-800 lg:block" />
+          <div className="absolute left-0 right-0 top-16 hidden h-0.5 bg-gradient-to-r from-transparent via-wellness-200 to-transparent lg:block" />
 
           {steps.map((item, index) => (
             <div key={index} className="relative flex flex-col items-center text-center">
               {/* Step number badge */}
               <div className="relative z-10 mb-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wellness-100 text-wellness-700 shadow-sm transition-all duration-300 hover:scale-110 hover:shadow-md dark:bg-wellness-900/50 dark:text-wellness-400">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wellness-100 text-wellness-700 shadow-sm transition-all duration-300 hover:scale-110 hover:shadow-md">
                   <item.icon className="h-7 w-7" />
                 </div>
-                <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-wellness-600 text-xs font-bold text-white shadow-sm dark:bg-wellness-500">
+                <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-wellness-600 text-xs font-bold text-white shadow-sm">
                   {item.step}
                 </span>
               </div>

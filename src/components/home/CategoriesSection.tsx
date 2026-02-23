@@ -15,51 +15,45 @@ const categories = [
     title: "Vitamins & Minerals",
     description: "Essential daily nutrients for overall health",
     color: "from-teal-500 to-emerald-600",
-    darkColor: "dark:from-teal-600 dark:to-emerald-700",
   },
   {
     icon: Apple,
     title: "Immunity Boosters",
     description: "Strengthen your body's natural defenses",
     color: "from-green-500 to-teal-600",
-    darkColor: "dark:from-green-600 dark:to-teal-700",
   },
   {
     icon: Droplets,
     title: "Herbal Extracts",
     description: "Traditional Ayurvedic formulations",
     color: "from-emerald-500 to-green-600",
-    darkColor: "dark:from-emerald-600 dark:to-green-700",
   },
   {
     icon: Dumbbell,
     title: "Sports Nutrition",
     description: "Fuel your active lifestyle",
     color: "from-cyan-500 to-teal-600",
-    darkColor: "dark:from-cyan-600 dark:to-teal-700",
   },
   {
     icon: Brain,
     title: "Brain Health",
     description: "Cognitive support & mental clarity",
     color: "from-teal-600 to-cyan-600",
-    darkColor: "dark:from-teal-700 dark:to-cyan-700",
   },
   {
     icon: HeartPulse,
     title: "Heart Health",
     description: "Cardiovascular wellness support",
     color: "from-emerald-600 to-teal-600",
-    darkColor: "dark:from-emerald-700 dark:to-teal-700",
   },
 ];
 
 export default function CategoriesSection() {
   return (
-    <section className="bg-gradient-to-b from-background to-wellness-50/50 dark:from-background dark:to-wellness-950/20 py-20">
+    <section className="bg-gradient-to-b from-background to-wellness-50/50 py-20">
       <div className="container mx-auto px-4">
         <div className="mb-14 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Categories
           </span>
           <h2 className="mt-2 font-heading text-3xl font-bold text-foreground sm:text-4xl">
@@ -80,12 +74,12 @@ export default function CategoriesSection() {
             >
               <div className="flex items-start gap-4">
                 <div
-                  className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${cat.color} ${cat.darkColor} text-white shadow-md transition-transform duration-300 group-hover:scale-110`}
+                  className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${cat.color} text-white shadow-md transition-transform duration-300 group-hover:scale-110`}
                 >
                   <cat.icon className="h-7 w-7" />
                 </div>
                 <div>
-                  <h3 className="font-heading text-lg font-semibold text-card-foreground group-hover:text-wellness-600 dark:group-hover:text-wellness-400 transition-colors">
+                  <h3 className="font-heading text-lg font-semibold text-card-foreground group-hover:text-wellness-600 transition-colors">
                     {cat.title}
                   </h3>
                   <p className="mt-1 text-sm text-muted-foreground">

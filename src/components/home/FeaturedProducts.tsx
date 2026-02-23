@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import ProductCard from "@/components/common/ProductCard";
 
 export default function FeaturedProducts() {
@@ -26,18 +28,16 @@ export default function FeaturedProducts() {
   }, []);
 
   // Infinite loop: render 3 copies and keep scroll centered on the middle copy
-  const tripled = products.length > 0 ? [...products, ...products, ...products] : [];
+  const tripled =
+    products.length > 0 ? [...products, ...products, ...products] : [];
 
   const resetScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el || products.length === 0) return;
-    // Each product card is ~280px + 24px gap = ~304px
     const singleSetWidth = el.scrollWidth / 3;
-    // If scrolled past the end of the middle copy, jump back
     if (el.scrollLeft >= singleSetWidth * 2) {
       el.scrollLeft -= singleSetWidth;
     }
-    // If scrolled before the start of the middle copy, jump forward
     if (el.scrollLeft <= 0) {
       el.scrollLeft += singleSetWidth;
     }
@@ -75,11 +75,12 @@ export default function FeaturedProducts() {
     const scrollAmount = 300;
     const maxScroll = el.scrollWidth - el.clientWidth;
 
-    // Pre-reposition: if we're about to hit the physical edge,
-    // instantly jump to the identical position in the middle copy first
     if (direction === "left" && el.scrollLeft <= scrollAmount) {
       el.scrollLeft += singleSetWidth;
-    } else if (direction === "right" && el.scrollLeft >= maxScroll - scrollAmount) {
+    } else if (
+      direction === "right" &&
+      el.scrollLeft >= maxScroll - scrollAmount
+    ) {
       el.scrollLeft -= singleSetWidth;
     }
 
@@ -90,19 +91,18 @@ export default function FeaturedProducts() {
   };
 
   return (
-    <section className="py-20">
+    <section className="py-14">
       <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="mb-12 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+        <div className="mb-10 text-center">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Our Products
           </span>
-          <h2 className="mt-2 font-heading text-3xl font-bold text-foreground sm:text-4xl">
-            Our Supplements
+          <h2 className="mt-2 font-heading text-3xl font-bold text-heading sm:text-4xl">
+            Our Best Sellers
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-            Carefully crafted supplements designed to support your wellness
-            journey with the purest natural ingredients.
+            Carefully formulated supplements trusted by our growing community.
           </p>
         </div>
       </div>
@@ -148,7 +148,10 @@ export default function FeaturedProducts() {
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {tripled.map((product, idx) => (
-              <div key={`${product._id}-${idx}`} className="w-[260px] flex-shrink-0 sm:w-[280px]">
+              <div
+                key={`${product._id}-${idx}`}
+                className="w-[260px] flex-shrink-0 sm:w-[280px]"
+              >
                 <ProductCard product={product} />
               </div>
             ))}
@@ -159,6 +162,23 @@ export default function FeaturedProducts() {
           <p className="text-center text-muted-foreground">
             Products coming soon! Check back later.
           </p>
+        </div>
+      )}
+
+      {/* View All CTA */}
+      {!loading && products.length > 0 && (
+        <div className="mt-10 text-center">
+          <Button
+            variant="outline"
+            size="lg"
+            asChild
+            className="border-wellness-300 text-wellness-700 hover:bg-wellness-50"
+          >
+            <Link href="/shop" className="flex items-center gap-2">
+              View All Products
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          </Button>
         </div>
       )}
     </section>

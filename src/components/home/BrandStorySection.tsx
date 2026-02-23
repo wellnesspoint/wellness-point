@@ -19,8 +19,8 @@ export default function BrandStorySection() {
         <div className="grid items-center gap-12 lg:grid-cols-2">
           {/* Left: visual */}
           <div className="relative">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-wellness-100 to-wellness-200 dark:from-wellness-900/40 dark:to-wellness-800/30 p-1">
-              <div className="rounded-[calc(1.5rem-4px)] bg-gradient-to-br from-wellness-50 to-white dark:from-wellness-950/80 dark:to-background p-10 sm:p-14">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-wellness-100 to-wellness-200 p-1">
+              <div className="rounded-[calc(1.5rem-4px)] bg-gradient-to-br from-wellness-50 to-white p-10 sm:p-14">
                 <div className="flex flex-col items-center text-center">
                   <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-wellness-500 to-wellness-700 shadow-xl">
                     <span className="text-3xl font-bold text-white">W</span>
@@ -28,7 +28,7 @@ export default function BrandStorySection() {
                   <h3 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">
                     Wellness Point
                   </h3>
-                  <p className="mt-2 text-sm font-medium text-wellness-600 dark:text-wellness-400">
+                  <p className="mt-2 text-sm font-medium text-wellness-600">
                     Your Trusted Wellness Partner
                   </p>
                   <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -36,7 +36,7 @@ export default function BrandStorySection() {
                       (badge) => (
                         <span
                           key={badge}
-                          className="rounded-full bg-wellness-100 px-4 py-1.5 text-xs font-semibold text-wellness-700 dark:bg-wellness-900/50 dark:text-wellness-300"
+                          className="rounded-full bg-wellness-100 px-4 py-1.5 text-xs font-semibold text-wellness-700"
                         >
                           {badge}
                         </span>
@@ -47,13 +47,13 @@ export default function BrandStorySection() {
               </div>
             </div>
             {/* Decorative blobs */}
-            <div className="absolute -bottom-4 -left-4 h-24 w-24 rounded-full bg-wellness-300/20 blur-2xl dark:bg-wellness-500/10" />
-            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-wellness-200/30 blur-2xl dark:bg-wellness-600/10" />
+            <div className="absolute -bottom-4 -left-4 h-24 w-24 rounded-full bg-wellness-300/20 blur-2xl" />
+            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-wellness-200/30 blur-2xl" />
           </div>
 
           {/* Right: content */}
           <div>
-            <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+            <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
               Our Story
             </span>
             <h2 className="mt-2 font-heading text-3xl font-bold text-foreground sm:text-4xl">

@@ -41,7 +41,7 @@ export default function CartSidebar() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
-            <ShoppingBag className="h-5 w-5 text-wellness-600 dark:text-wellness-400" />
+            <ShoppingBag className="h-5 w-5 text-wellness-600" />
             <h2 className="font-heading text-lg font-semibold text-foreground">
               Your Cart ({items.length})
             </h2>
@@ -99,14 +99,14 @@ export default function CartSidebar() {
                 </span>
               </div>
               {shipping > 0 && (
-                <p className="text-xs text-wellness-600 dark:text-wellness-400">
+                <p className="text-xs text-wellness-600">
                   Free shipping on orders above {formatPrice(999)}
                 </p>
               )}
               <Separator />
               <div className="flex justify-between text-base font-semibold">
                 <span>Total</span>
-                <span className="text-wellness-600 dark:text-wellness-400">{formatPrice(total)}</span>
+                <span className="text-wellness-600">{formatPrice(total)}</span>
               </div>
             </div>
             <Button
@@ -154,7 +154,7 @@ function CartItemCard({
         <div className="flex justify-between">
           <Link
             href={`/product/${item.slug}`}
-            className="text-sm font-medium text-foreground hover:text-wellness-600 dark:hover:text-wellness-400"
+            className="text-sm font-medium text-foreground hover:text-wellness-600"
           >
             {item.name}
           </Link>
@@ -187,7 +187,7 @@ function CartItemCard({
               <Plus className="h-3 w-3" />
             </button>
           </div>
-          <span className="text-sm font-semibold text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold text-wellness-600">
             {formatPrice(effectivePrice * item.quantity)}
           </span>
         </div>

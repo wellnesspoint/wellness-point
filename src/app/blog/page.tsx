@@ -31,7 +31,7 @@ export default function BlogPage() {
     <div className="gradient-wellness py-16">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Wellness Journal
           </span>
           <h1 className="mt-2 font-heading text-4xl font-bold text-foreground">
@@ -78,7 +78,7 @@ export default function BlogPage() {
                       </Badge>
                     ))}
                   </div>
-                  <h2 className="mb-2 font-heading text-lg font-semibold text-card-foreground line-clamp-2 group-hover:text-wellness-600 dark:group-hover:text-wellness-400">
+                  <h2 className="mb-2 font-heading text-lg font-semibold text-card-foreground line-clamp-2 group-hover:text-wellness-600">
                     {post.title}
                   </h2>
                   <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
@@ -95,7 +95,7 @@ export default function BlogPage() {
                     </div>
                     <Link
                       href={`/blog/${post.slug}`}
-                      className="flex items-center gap-1 text-xs font-medium text-wellness-600 dark:text-wellness-400 hover:text-wellness-700 dark:hover:text-wellness-300"
+                      className="flex items-center gap-1 text-xs font-medium text-wellness-600 hover:text-wellness-700"
                     >
                       Read More
                       <ArrowRight className="h-3 w-3" />

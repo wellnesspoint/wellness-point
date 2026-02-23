@@ -75,56 +75,56 @@ export default function AdminDashboard() {
       title: "Total Revenue",
       value: `₹${stats.totalRevenue.toLocaleString("en-IN")}`,
       icon: IndianRupee,
-      color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400",
+      color: "text-emerald-600 bg-emerald-50",
       href: "/admin/payments",
     },
     {
       title: "Today's Sales",
       value: `₹${stats.todaySales.toLocaleString("en-IN")}`,
       icon: TrendingUp,
-      color: "text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-400",
+      color: "text-blue-600 bg-blue-50",
       href: "/admin/payments",
     },
     {
       title: "Total Orders",
       value: stats.totalOrders,
       icon: ShoppingBag,
-      color: "text-purple-600 bg-purple-50 dark:bg-purple-950/50 dark:text-purple-400",
+      color: "text-purple-600 bg-purple-50",
       href: "/admin/orders",
     },
     {
       title: "Pending Orders",
       value: stats.pendingOrders,
       icon: Clock,
-      color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400",
+      color: "text-yellow-600 bg-yellow-50",
       href: "/admin/orders",
     },
     {
       title: "Total Customers",
       value: stats.totalCustomers,
       icon: Users,
-      color: "text-orange-600 bg-orange-50 dark:bg-orange-950/50 dark:text-orange-400",
+      color: "text-orange-600 bg-orange-50",
       href: "/admin/customers",
     },
     {
       title: "Total Products",
       value: stats.totalProducts,
       icon: Package,
-      color: "text-cyan-600 bg-cyan-50 dark:bg-cyan-950/50 dark:text-cyan-400",
+      color: "text-cyan-600 bg-cyan-50",
       href: "/admin/products",
     },
     {
       title: "Paid Orders",
       value: stats.paidOrders,
       icon: CheckCircle,
-      color: "text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400",
+      color: "text-green-600 bg-green-50",
       href: "/admin/payments",
     },
     {
       title: "Failed Payments",
       value: stats.failedOrders,
       icon: XCircle,
-      color: "text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400",
+      color: "text-red-600 bg-red-50",
       href: "/admin/payments",
     },
   ];
@@ -281,7 +281,7 @@ export default function AdminDashboard() {
                   {stats.lowStockProducts.map((p) => (
                     <div
                       key={p._id}
-                      className="flex items-center justify-between rounded-lg bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2"
+                      className="flex items-center justify-between rounded-lg bg-yellow-50 px-3 py-2"
                     >
                       <span className="text-xs font-medium text-foreground truncate max-w-[150px]">
                         {p.name}

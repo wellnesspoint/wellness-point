@@ -50,21 +50,21 @@ export default function DashboardPage() {
       value: stats.orders,
       icon: Package,
       href: "/dashboard/orders",
-      color: "text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-400",
+      color: "text-blue-600 bg-blue-50",
     },
     {
       title: "Wishlist Items",
       value: stats.wishlist,
       icon: Heart,
       href: "/dashboard/wishlist",
-      color: "text-red-500 bg-red-50 dark:bg-red-950/50 dark:text-red-400",
+      color: "text-red-500 bg-red-50",
     },
     {
       title: "Saved Addresses",
       value: stats.addresses,
       icon: MapPin,
       href: "/dashboard/addresses",
-      color: "text-wellness-600 bg-wellness-50 dark:bg-wellness-950/50 dark:text-wellness-400",
+      color: "text-wellness-600 bg-wellness-50",
     },
   ];
 
@@ -134,16 +134,16 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-wellness-600 dark:text-wellness-400">
+                    <p className="text-sm font-semibold text-wellness-600">
                       ₹{order.total}
                     </p>
                     <span
                       className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                         order.paymentStatus === "paid"
-                          ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400"
+                          ? "bg-green-100 text-green-700"
                           : order.paymentStatus === "pending"
-                          ? "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400"
-                          : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-red-100 text-red-700"
                       }`}
                     >
                       {order.paymentStatus}

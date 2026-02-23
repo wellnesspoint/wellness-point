@@ -24,10 +24,10 @@ export default function TestimonialsSection() {
   }, []);
 
   return (
-    <section className="py-20">
+    <section className="py-14">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Testimonials
           </span>
           <h2 className="mt-2 font-heading text-3xl font-bold text-foreground sm:text-4xl">
@@ -54,16 +54,15 @@ export default function TestimonialsSection() {
                 key={t._id}
                 className="relative rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
               >
-                <Quote className="absolute right-4 top-4 h-8 w-8 text-wellness-100 dark:text-wellness-900/50" />
+                <Quote className="absolute right-4 top-4 h-8 w-8 text-wellness-100" />
                 <div className="mb-3 flex gap-0.5">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Star
                       key={i}
-                      className={`h-4 w-4 ${
-                        i < t.rating
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "fill-muted text-muted"
-                      }`}
+                      className={`h-4 w-4 ${i < t.rating
+                        ? "fill-yellow-400 text-yellow-400"
+                        : "fill-muted text-muted"
+                        }`}
                     />
                   ))}
                 </div>

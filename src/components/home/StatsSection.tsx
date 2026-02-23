@@ -30,7 +30,7 @@ const stats = [
 
 export default function StatsSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-r from-wellness-800 via-wellness-700 to-wellness-800 dark:from-wellness-950 dark:via-wellness-900 dark:to-wellness-950 py-16">
+    <section className="relative overflow-hidden bg-gradient-to-r from-wellness-800 via-wellness-700 to-wellness-800 py-16">
       {/* Decorative pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute left-1/4 top-0 h-40 w-40 rounded-full bg-white blur-3xl" />

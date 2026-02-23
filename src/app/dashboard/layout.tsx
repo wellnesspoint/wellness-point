@@ -75,7 +75,7 @@ export default function DashboardLayout({
                   className={cn(
                     "flex items-center gap-3 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
                     pathname === link.href
-                      ? "bg-wellness-50 dark:bg-wellness-900/30 text-wellness-700 dark:text-wellness-400"
+                      ? "bg-wellness-50 text-wellness-700"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
                 >

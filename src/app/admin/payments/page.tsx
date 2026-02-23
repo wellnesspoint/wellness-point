@@ -149,7 +149,7 @@ export default function AdminPaymentsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 dark:bg-green-950/50 text-green-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600">
               <IndianRupee className="h-6 w-6" />
             </div>
             <div>
@@ -160,7 +160,7 @@ export default function AdminPaymentsPage() {
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-50 dark:bg-yellow-950/50 text-yellow-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-50 text-yellow-600">
               <Clock className="h-6 w-6" />
             </div>
             <div>
@@ -171,7 +171,7 @@ export default function AdminPaymentsPage() {
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 dark:bg-red-950/50 text-red-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
               <XCircle className="h-6 w-6" />
             </div>
             <div>
@@ -182,7 +182,7 @@ export default function AdminPaymentsPage() {
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
               <TrendingUp className="h-6 w-6" />
             </div>
             <div>

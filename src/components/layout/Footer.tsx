@@ -67,7 +67,7 @@ const socialLinks = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border bg-wellness-950 text-muted dark:bg-background dark:border-t" role="contentinfo">
+    <footer className="border-t border-border bg-wellness-950 text-muted" role="contentinfo">
       <div className="container mx-auto px-4 py-12">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
@@ -80,7 +80,7 @@ export default function Footer() {
                 height={44}
                 className="h-11 w-11 object-contain"
               />
-              <span className="font-heading text-xl font-bold text-white dark:text-foreground">
+              <span className="font-heading text-xl font-bold text-white">
                 Wellness Point
               </span>
             </Link>
@@ -128,7 +128,7 @@ export default function Footer() {
 
           {/* Company Links */}
           <div>
-            <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white dark:text-foreground">
+            <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white">
               Company
             </h3>
             <ul className="space-y-2">
@@ -136,7 +136,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400 dark:text-muted-foreground dark:hover:text-wellness-400"
+                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400"
                   >
                     {link.label}
                   </Link>
@@ -147,7 +147,7 @@ export default function Footer() {
 
           {/* Account + Legal */}
           <div>
-            <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white dark:text-foreground">
+            <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white">
               My Account
             </h3>
             <ul className="space-y-2">
@@ -155,14 +155,14 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400 dark:text-muted-foreground dark:hover:text-wellness-400"
+                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400 "
                   >
                     {link.label}
                   </Link>
                 </li>
               ))}
             </ul>
-            <h3 className="mb-4 mt-6 font-heading text-sm font-semibold uppercase tracking-wider text-white dark:text-foreground">
+            <h3 className="mb-4 mt-6 font-heading text-sm font-semibold uppercase tracking-wider text-white">
               Legal
             </h3>
             <ul className="space-y-2">
@@ -170,7 +170,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400 dark:text-muted-foreground dark:hover:text-wellness-400"
+                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400 "
                   >
                     {link.label}
                   </Link>
@@ -181,19 +181,19 @@ export default function Footer() {
 
           {/* Newsletter */}
           <div>
-            <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white dark:text-foreground">
+            <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white">
               Stay Updated
             </h3>
-            <p className="mb-4 text-sm text-muted-foreground dark:text-muted-foreground">
+            <p className="mb-4 text-sm text-muted-foreground">
               Subscribe to our newsletter for wellness tips and exclusive offers.
             </p>
             <NewsletterForm />
           </div>
         </div>
 
-        <Separator className="my-8 bg-white/10 dark:bg-border" />
+        <Separator className="my-8 bg-white/10" />
 
-        <div className="flex flex-col items-center justify-between gap-4 text-center text-xs text-muted-foreground dark:text-muted-foreground sm:flex-row">
+        <div className="flex flex-col items-center justify-between gap-4 text-center text-xs text-muted-foreground sm:flex-row">
           <p>&copy; {new Date().getFullYear()} Wellness Point. All rights reserved.</p>
           <p>Made with care for your wellness journey.</p>
         </div>

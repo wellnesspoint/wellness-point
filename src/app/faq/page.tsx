@@ -19,7 +19,7 @@ export default function FAQPage() {
     <div className="gradient-wellness py-16">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Support
           </span>
           <h1 className="mt-2 font-heading text-4xl font-bold text-foreground">
@@ -48,7 +48,7 @@ export default function FAQPage() {
             ))}
           </Accordion>
 
-          <div className="mt-12 rounded-2xl bg-wellness-50 dark:bg-wellness-950/30 p-8 text-center">
+          <div className="mt-12 rounded-2xl bg-wellness-50 p-8 text-center">
             <h2 className="mb-2 font-heading text-xl font-semibold text-foreground">
               Still have questions?
             </h2>

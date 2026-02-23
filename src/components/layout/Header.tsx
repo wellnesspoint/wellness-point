@@ -54,7 +54,7 @@ export default function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-wellness-600 dark:hover:text-wellness-400"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-wellness-50 hover:text-wellness-600"
             >
               {link.label}
             </Link>
@@ -67,7 +67,7 @@ export default function Header() {
 
           <Link
             href="/dashboard/wishlist"
-            className="relative hidden rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-wellness-600 dark:hover:text-wellness-400 sm:block"
+            className="relative hidden rounded-full p-2 text-muted-foreground transition-colors hover:bg-wellness-50 hover:text-wellness-600 sm:block"
             aria-label="Wishlist"
           >
             <Heart className="h-5 w-5" />
@@ -75,7 +75,7 @@ export default function Header() {
 
           <button
             onClick={openCart}
-            className="relative rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-wellness-600 dark:hover:text-wellness-400"
+            className="relative rounded-full p-2 text-muted-foreground transition-colors hover:bg-wellness-50 hover:text-wellness-600"
             aria-label="Shopping cart"
           >
             <ShoppingCart className="h-5 w-5" />
@@ -181,7 +181,7 @@ export default function Header() {
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-              className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-wellness-600 dark:hover:text-wellness-400"
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-wellness-50 hover:text-wellness-600"
             >
               {link.label}
             </Link>
@@ -189,7 +189,7 @@ export default function Header() {
           <Link
             href="/dashboard/wishlist"
             onClick={() => setMobileOpen(false)}
-            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-wellness-600 dark:hover:text-wellness-400"
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-wellness-50 hover:text-wellness-600"
           >
             <Heart className="h-4 w-4" />
             Wishlist

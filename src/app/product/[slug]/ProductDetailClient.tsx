@@ -74,7 +74,7 @@ export default function ProductDetailClient({
     fetch(`/api/reviews?productId=${product._id}`)
       .then((r) => r.json())
       .then((d) => setReviews(d.reviews || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setReviewsLoading(false));
   }, [product._id]);
 
@@ -180,11 +180,10 @@ export default function ProductDetailClient({
                   <button
                     key={i}
                     onClick={() => setSelectedImage(i)}
-                    className={`relative h-20 w-20 overflow-hidden rounded-lg border-2 transition-all ${
-                      i === selectedImage
+                    className={`relative h-20 w-20 overflow-hidden rounded-lg border-2 transition-all ${i === selectedImage
                         ? "border-wellness-600 shadow-md"
                         : "border-gray-200 hover:border-wellness-300"
-                    }`}
+                      }`}
                   >
                     <Image
                       src={img}
@@ -214,11 +213,10 @@ export default function ProductDetailClient({
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
                     key={i}
-                    className={`h-5 w-5 ${
-                      i < Math.round(product.rating)
+                    className={`h-5 w-5 ${i < Math.round(product.rating)
                         ? "fill-yellow-400 text-yellow-400"
                         : "fill-muted text-muted"
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
@@ -297,7 +295,7 @@ export default function ProductDetailClient({
 
               <Button
                 size="lg"
-                className="flex-1 bg-wellness-800 text-white hover:bg-wellness-900 dark:bg-wellness-300 dark:text-wellness-950 dark:hover:bg-wellness-200"
+                className="flex-1 bg-wellness-800 text-white hover:bg-wellness-900"
                 onClick={handleBuyNow}
                 disabled={product.stock === 0}
               >
@@ -333,7 +331,7 @@ export default function ProductDetailClient({
             </div>
 
             {/* Policy Notice */}
-            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-700 dark:text-amber-400">
+            <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
               <p className="font-semibold">Policy:</p>
               <p>No COD • No Exchange or Replacement • No Refund</p>
             </div>
@@ -423,11 +421,10 @@ export default function ProductDetailClient({
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star
                           key={i}
-                          className={`h-4 w-4 ${
-                            i < Math.round(product.rating)
+                          className={`h-4 w-4 ${i < Math.round(product.rating)
                               ? "fill-yellow-400 text-yellow-400"
                               : "fill-muted text-muted"
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
@@ -471,11 +468,10 @@ export default function ProductDetailClient({
                             {Array.from({ length: 5 }).map((_, i) => (
                               <Star
                                 key={i}
-                                className={`h-3.5 w-3.5 ${
-                                  i < review.rating
+                                className={`h-3.5 w-3.5 ${i < review.rating
                                     ? "fill-yellow-400 text-yellow-400"
                                     : "fill-muted text-muted"
-                                }`}
+                                  }`}
                               />
                             ))}
                           </div>
@@ -504,11 +500,10 @@ export default function ProductDetailClient({
                               className="transition-transform hover:scale-110"
                             >
                               <Star
-                                className={`h-7 w-7 ${
-                                  i < reviewForm.rating
+                                className={`h-7 w-7 ${i < reviewForm.rating
                                     ? "fill-yellow-400 text-yellow-400"
                                     : "fill-muted text-muted hover:fill-yellow-200 hover:text-yellow-200"
-                                }`}
+                                  }`}
                               />
                             </button>
                           ))}

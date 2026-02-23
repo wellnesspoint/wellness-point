@@ -7,7 +7,7 @@ export default function CTASection() {
   return (
     <section className="py-20">
       <div className="container mx-auto px-4">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-wellness-700 to-wellness-900 dark:from-wellness-800 dark:to-wellness-950 p-10 text-center text-white shadow-2xl sm:p-16">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-wellness-700 to-wellness-900 p-10 text-center text-white shadow-2xl sm:p-16">
           {/* Decorative elements */}
           <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-wellness-500/20 blur-3xl" />
           <div className="absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-wellness-400/20 blur-3xl" />

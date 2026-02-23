@@ -19,7 +19,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         wellness:
-          "bg-gradient-to-r from-wellness-600 to-wellness-700 text-white hover:from-wellness-700 hover:to-wellness-800 shadow-md hover:shadow-lg dark:from-wellness-500 dark:to-wellness-600 dark:hover:from-wellness-600 dark:hover:to-wellness-700",
+          "bg-gradient-to-r from-wellness-600 to-wellness-700 text-white hover:from-wellness-700 hover:to-wellness-800 shadow-md hover:shadow-lg",
       },
       size: {
         default: "h-10 px-4 py-2",
@@ -37,7 +37,7 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }
 

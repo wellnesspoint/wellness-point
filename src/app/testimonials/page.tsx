@@ -27,7 +27,7 @@ export default function TestimonialsPage() {
     <div className="gradient-wellness py-16">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
-          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600 dark:text-wellness-400">
+          <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Customer Love
           </span>
           <h1 className="mt-2 font-heading text-4xl font-bold text-foreground">
@@ -57,7 +57,7 @@ export default function TestimonialsPage() {
                 key={t._id}
                 className="relative rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
               >
-                <Quote className="absolute right-4 top-4 h-8 w-8 text-wellness-100 dark:text-wellness-900/50" />
+                <Quote className="absolute right-4 top-4 h-8 w-8 text-wellness-100" />
                 <div className="mb-3 flex gap-0.5">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Star

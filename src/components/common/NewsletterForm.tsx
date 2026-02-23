@@ -45,7 +45,7 @@ export default function NewsletterForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
-        className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-wellness-400 dark:bg-white/10 dark:border-white/20"
+        className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-wellness-400"
       />
       <Button
         type="submit"
