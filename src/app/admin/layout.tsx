@@ -147,13 +147,13 @@ export default function AdminLayout({
 
           {/* Bottom: Back to Store */}
           <div className="border-t border-border p-3">
-            <Link
-              href="/"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
               Back to Store
-            </Link>
+            </button>
           </div>
         </div>
       </aside>

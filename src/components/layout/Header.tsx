@@ -28,6 +28,10 @@ export default function Header() {
   const cartItemCount = useCartStore((s) => s.getItemCount());
   const openCart = useCartStore((s) => s.openCart);
 
+  // Admin sessions should not appear as logged in on the storefront
+  const isAdmin = (session?.user as any)?.role === "admin";
+  const isLoggedIn = !!session && !isAdmin;
+
   useEffect(() => setMounted(true), []);
 
   return (
@@ -86,7 +90,7 @@ export default function Header() {
             )}
           </button>
 
-          {session ? (
+          {isLoggedIn ? (
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
