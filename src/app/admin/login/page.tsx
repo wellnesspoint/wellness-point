@@ -26,21 +26,13 @@ export default function AdminLoginPage() {
       const res = await signIn("credentials", {
         email,
         password,
+        loginType: "admin",
         redirect: false,
       });
 
       if (res?.error) {
-        toast.error("Invalid admin credentials");
+        toast.error(res.error);
       } else {
-        // Verify this user is actually an admin
-        const sessionRes = await fetch("/api/auth/session");
-        const session = await sessionRes.json();
-        if (session?.user?.role !== "admin") {
-          toast.error("Access denied. Admin credentials required.");
-          // Sign out the non-admin user
-          await fetch("/api/auth/signout", { method: "POST" });
-          return;
-        }
         toast.success("Welcome to Admin Panel");
         router.push("/admin");
         router.refresh();
