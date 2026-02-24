@@ -438,7 +438,7 @@ export default function AdminOrdersPage() {
       o.user?.name || o.shippingAddress?.fullName || "",
       o.user?.email || "",
       o.items.length,
-      o.total,
+      o.items.reduce((s: number, item: any) => s + item.price * item.quantity, 0) + (o.shipping || 0) - (o.discount || 0),
       o.paymentStatus,
       o.orderStatus,
       new Date(o.createdAt).toLocaleDateString("en-IN"),
@@ -543,7 +543,7 @@ export default function AdminOrdersPage() {
               <div className="mt-4 space-y-2 border-t pt-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>₹{o.subtotal?.toLocaleString("en-IN")}</span>
+                  <span>₹{o.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0).toLocaleString("en-IN")}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shipping</span>
@@ -557,7 +557,7 @@ export default function AdminOrdersPage() {
                 )}
                 <div className="flex justify-between border-t pt-2 text-base font-bold">
                   <span>Total</span>
-                  <span className="text-emerald-600">₹{o.total?.toLocaleString("en-IN")}</span>
+                  <span className="text-emerald-600">₹{(o.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (o.shipping || 0) - (o.discount || 0)).toLocaleString("en-IN")}</span>
                 </div>
               </div>
             </CardContent>
@@ -772,7 +772,7 @@ export default function AdminOrdersPage() {
                     {order.items.length} item{order.items.length !== 1 ? "s" : ""}
                   </td>
                   <td className="py-3 font-semibold text-emerald-700">
-                    ₹{order.total.toLocaleString("en-IN")}
+                    ₹{(order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (order.shipping || 0) - (order.discount || 0)).toLocaleString("en-IN")}
                   </td>
                   <td className="py-3">
                     <select

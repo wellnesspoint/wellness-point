@@ -30,9 +30,15 @@ export async function GET(req: NextRequest) {
     const revenueByDay: Record<string, number> = {};
     const ordersByDay: Record<string, number> = {};
 
+    // Helper: calculate total from items
+    const calcTotal = (o: any) => {
+      const sub = (o.items || []).reduce((s: number, item: any) => s + (item.price || 0) * (item.quantity || 1), 0);
+      return sub + (o.shipping || 0) - (o.discount || 0);
+    };
+
     orders.forEach((order: any) => {
       const day = new Date(order.createdAt).toISOString().split("T")[0];
-      revenueByDay[day] = (revenueByDay[day] || 0) + (order.total || 0);
+      revenueByDay[day] = (revenueByDay[day] || 0) + calcTotal(order);
       ordersByDay[day] = (ordersByDay[day] || 0) + 1;
     });
 
@@ -96,7 +102,7 @@ export async function GET(req: NextRequest) {
     // --- Summary Stats ---
     const totalOrders = await Order.countDocuments();
     const paidOrders = await Order.countDocuments({ paymentStatus: "paid" });
-    const totalRevenue = allPaidOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+    const totalRevenue = allPaidOrders.reduce((sum: number, o: any) => sum + calcTotal(o), 0);
     const totalCustomers = await User.countDocuments({ role: "user" });
     const totalProducts = await Product.countDocuments();
     const avgOrderValue = paidOrders > 0 ? totalRevenue / paidOrders : 0;
@@ -125,7 +131,7 @@ export async function GET(req: NextRequest) {
       createdAt: { $gte: prevStart, $lt: startDate },
       paymentStatus: "paid",
     }).lean();
-    const prevRevenue = prevOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+    const prevRevenue = prevOrders.reduce((sum: number, o: any) => sum + calcTotal(o), 0);
     const prevOrderCount = prevOrders.length;
 
     return NextResponse.json({
@@ -143,7 +149,7 @@ export async function GET(req: NextRequest) {
       statusCounts,
       paymentStatusCounts,
       comparison: {
-        currentRevenue: orders.reduce((sum: number, o: any) => sum + (o.total || 0), 0),
+        currentRevenue: orders.reduce((sum: number, o: any) => sum + calcTotal(o), 0),
         previousRevenue: prevRevenue,
         currentOrders: orders.length,
         previousOrders: prevOrderCount,

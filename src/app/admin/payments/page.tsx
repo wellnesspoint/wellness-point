@@ -23,14 +23,22 @@ interface PaymentOrder {
   _id: string;
   user?: { name: string; email: string };
   shippingAddress?: { fullName: string };
+  items: { price: number; quantity: number; name: string }[];
   total: number;
   subtotal: number;
   shipping: number;
+  discount: number;
   paymentStatus: string;
   orderStatus: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   createdAt: string;
+}
+
+// Calculate total from item prices
+function calcOrderTotal(o: PaymentOrder): number {
+  const sub = o.items.reduce((s, item) => s + item.price * item.quantity, 0);
+  return sub + (o.shipping || 0) - (o.discount || 0);
 }
 
 export default function AdminPaymentsPage() {
@@ -45,7 +53,7 @@ export default function AdminPaymentsPage() {
     fetch("/api/admin/orders")
       .then((r) => r.json())
       .then((d) => setOrders(d.orders || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -63,28 +71,31 @@ export default function AdminPaymentsPage() {
     .filter((o) =>
       search
         ? o._id.toLowerCase().includes(search.toLowerCase()) ||
-          o.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
-          o.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
-          o.razorpayPaymentId?.toLowerCase().includes(search.toLowerCase()) ||
-          o.razorpayOrderId?.toLowerCase().includes(search.toLowerCase())
+        o.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        o.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
+        o.razorpayPaymentId?.toLowerCase().includes(search.toLowerCase()) ||
+        o.razorpayOrderId?.toLowerCase().includes(search.toLowerCase())
         : true
     );
 
   const totalRevenue = filtered
     .filter((o) => o.paymentStatus === "paid")
-    .reduce((s, o) => s + o.total, 0);
+    .reduce((s, o) => s + calcOrderTotal(o), 0);
   const totalPending = filtered
     .filter((o) => o.paymentStatus === "pending")
-    .reduce((s, o) => s + o.total, 0);
+    .reduce((s, o) => s + calcOrderTotal(o), 0);
   const totalFailed = filtered.filter((o) => o.paymentStatus === "failed").length;
   const totalRefunded = filtered
     .filter((o) => o.paymentStatus === "refunded")
-    .reduce((s, o) => s + o.total, 0);
+    .reduce((s, o) => s + calcOrderTotal(o), 0);
 
-  // GST calculation (18% included in total)
+  // GST calculation (18% included in subtotal)
   const gstCollected = filtered
     .filter((o) => o.paymentStatus === "paid")
-    .reduce((s, o) => s + (o.subtotal * 0.18) / 1.18, 0);
+    .reduce((s, o) => {
+      const sub = o.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      return s + (sub * 0.18) / 1.18;
+    }, 0);
 
   const downloadReport = () => {
     const headers = [
@@ -95,8 +106,8 @@ export default function AdminPaymentsPage() {
       o._id,
       o.user?.name || o.shippingAddress?.fullName || "",
       o.user?.email || "",
-      o.total,
-      ((o.subtotal * 0.18) / 1.18).toFixed(2),
+      calcOrderTotal(o),
+      ((o.items.reduce((s: number, item: any) => s + item.price * item.quantity, 0) * 0.18) / 1.18).toFixed(2),
       o.paymentStatus,
       o.razorpayPaymentId || "",
       o.razorpayOrderId || "",
@@ -243,11 +254,10 @@ export default function AdminPaymentsPage() {
           <button
             key={s}
             onClick={() => setFilterPayment(s)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              filterPayment === s
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${filterPayment === s
                 ? "bg-emerald-600 text-white"
                 : "bg-muted text-muted-foreground hover:bg-accent"
-            }`}
+              }`}
           >
             {s.charAt(0).toUpperCase() + s.slice(1)}
             {s !== "all" && (
@@ -288,7 +298,7 @@ export default function AdminPaymentsPage() {
                     <p className="text-xs font-medium">{order.user?.name || order.shippingAddress?.fullName || "—"}</p>
                     <p className="text-[10px] text-muted-foreground">{order.user?.email || ""}</p>
                   </td>
-                  <td className="py-3 font-semibold">₹{order.total.toLocaleString("en-IN")}</td>
+                  <td className="py-3 font-semibold">₹{calcOrderTotal(order).toLocaleString("en-IN")}</td>
                   <td className="py-3 font-mono text-[10px] text-muted-foreground max-w-[120px] truncate">
                     {order.razorpayPaymentId || "—"}
                   </td>

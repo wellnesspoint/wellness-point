@@ -51,7 +51,7 @@ export default function HeroSection() {
                 variant="outline"
                 size="lg"
                 asChild
-                className="border-wellness-300 text-wellness-700 hover:bg-wellness-50"
+                className="border-wellness-300 text-wellness-700 hover:bg-wellness-50 hover:text-wellness-800"
               >
                 <Link href="/shop" className="flex items-center gap-2">
                   Explore Products

@@ -23,7 +23,7 @@ export default function CTASection() {
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button
                 size="lg"
-                className="bg-white text-wellness-800 hover:bg-wellness-50"
+                className="bg-white text-wellness-800 hover:bg-wellness-50 hover:text-wellness-800"
                 asChild
               >
                 <Link href="/shop" className="flex items-center gap-2">

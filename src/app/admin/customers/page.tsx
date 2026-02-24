@@ -48,7 +48,7 @@ export default function AdminCustomersPage() {
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((d) => setUsers(d.users || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   };
 
@@ -168,9 +168,8 @@ export default function AdminCustomersPage() {
                 </div>
                 <div>
                   <p className="font-semibold">{u.name || "—"}</p>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    u.isActive !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                  }`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${u.isActive !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                    }`}>
                     {u.isActive !== false ? "Active" : "Blocked"}
                   </span>
                 </div>
@@ -250,22 +249,20 @@ export default function AdminCustomersPage() {
                       {userOrders.map((order: any) => (
                         <tr key={order._id} className="hover:bg-accent/50">
                           <td className="py-2 font-mono text-xs">#{order._id.slice(-6).toUpperCase()}</td>
-                          <td className="py-2 font-semibold text-xs">₹{order.total?.toLocaleString("en-IN")}</td>
+                          <td className="py-2 font-semibold text-xs">₹{(order.items?.reduce((s: number, item: any) => s + item.price * item.quantity, 0) + (order.shipping || 0) - (order.discount || 0)).toLocaleString("en-IN")}</td>
                           <td className="py-2">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
-                              order.paymentStatus === "paid" ? "bg-green-100 text-green-700" :
-                              order.paymentStatus === "failed" ? "bg-red-100 text-red-700" :
-                              "bg-yellow-100 text-yellow-700"
-                            }`}>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" :
+                                order.paymentStatus === "failed" ? "bg-red-100 text-red-700" :
+                                  "bg-yellow-100 text-yellow-700"
+                              }`}>
                               {order.paymentStatus}
                             </span>
                           </td>
                           <td className="py-2">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
-                              order.orderStatus === "delivered" ? "bg-green-100 text-green-700" :
-                              order.orderStatus === "cancelled" ? "bg-red-100 text-red-700" :
-                              "bg-blue-100 text-blue-700"
-                            }`}>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${order.orderStatus === "delivered" ? "bg-green-100 text-green-700" :
+                                order.orderStatus === "cancelled" ? "bg-red-100 text-red-700" :
+                                  "bg-blue-100 text-blue-700"
+                              }`}>
                               {order.orderStatus}
                             </span>
                           </td>
@@ -381,18 +378,16 @@ export default function AdminCustomersPage() {
                   </td>
                   <td className="py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                        user.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-muted text-muted-foreground"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${user.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-muted text-muted-foreground"
+                        }`}
                     >
                       {user.role}
                     </span>
                   </td>
                   <td className="py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        user.isActive !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.isActive !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                        }`}
                     >
                       {user.isActive !== false ? "Active" : "Blocked"}
                     </span>
@@ -414,11 +409,10 @@ export default function AdminCustomersPage() {
                       {user.role !== "admin" && (
                         <button
                           onClick={() => toggleBlock(user._id, user.isActive !== false)}
-                          className={`rounded-lg p-2 ${
-                            user.isActive !== false
+                          className={`rounded-lg p-2 ${user.isActive !== false
                               ? "text-muted-foreground hover:bg-red-50 hover:text-red-500"
                               : "text-green-600 hover:bg-green-50"
-                          }`}
+                            }`}
                           title={user.isActive !== false ? "Block" : "Unblock"}
                         >
                           {user.isActive !== false ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}

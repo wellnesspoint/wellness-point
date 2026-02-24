@@ -43,13 +43,19 @@ export async function GET() {
         .lean(),
     ]);
 
+    // Helper: calculate total from items instead of stored order.total
+    const calcTotal = (o: any) => {
+      const subtotal = (o.items || []).reduce((s: number, item: any) => s + (item.price || 0) * (item.quantity || 1), 0);
+      return subtotal + (o.shipping || 0) - (o.discount || 0);
+    };
+
     // Calculate stats
     const totalRevenue = orders
       .filter((o: any) => o.paymentStatus === "paid")
-      .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+      .reduce((sum: number, o: any) => sum + calcTotal(o), 0);
 
     const todaySales = todayOrders.reduce(
-      (sum: number, o: any) => sum + (o.total || 0),
+      (sum: number, o: any) => sum + calcTotal(o),
       0
     );
 
@@ -85,7 +91,10 @@ export async function GET() {
       _id: o._id,
       user: o.user,
       shippingAddress: o.shippingAddress,
-      total: o.total,
+      items: o.items,
+      shipping: o.shipping,
+      discount: o.discount,
+      total: calcTotal(o),
       paymentStatus: o.paymentStatus,
       orderStatus: o.orderStatus,
       createdAt: o.createdAt,
