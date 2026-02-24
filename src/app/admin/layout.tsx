@@ -87,7 +87,10 @@ export default function AdminLayout({
   const currentPage = adminLinks.find((l) => l.href === pathname)?.label || "Admin";
 
   return (
-    <div className="flex h-screen bg-muted/50">
+    <div
+      className="flex h-screen bg-muted/50"
+      style={{ "--accent": "210 40% 94%", "--accent-foreground": "215 16% 35%" } as React.CSSProperties}
+    >
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
@@ -131,8 +134,8 @@ export default function AdminLayout({
                   href={link.href}
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${active
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                 >
                   <link.icon className="h-4 w-4" />

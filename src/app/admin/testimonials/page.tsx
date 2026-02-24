@@ -15,6 +15,7 @@ import {
   Star,
   CheckCircle,
   XCircle,
+  Pencil,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -43,6 +44,7 @@ export default function AdminTestimonialsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const fetchTestimonials = async () => {
     try {
@@ -93,6 +95,19 @@ export default function AdminTestimonialsPage() {
     }
   };
 
+  const handleEdit = (t: Testimonial) => {
+    setEditingId(t._id);
+    setForm({
+      name: t.name,
+      role: t.role || "",
+      image: t.image || "",
+      content: t.content,
+      rating: String(t.rating),
+      isApproved: t.isApproved,
+    });
+    setShowForm(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.content) {
@@ -102,24 +117,46 @@ export default function AdminTestimonialsPage() {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/testimonials", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          rating: Number(form.rating),
-        }),
-      });
-      if (!res.ok) throw new Error();
-      toast.success("Testimonial added");
+      if (editingId) {
+        // UPDATE existing testimonial
+        const res = await fetch(`/api/admin/testimonials/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+            rating: Number(form.rating),
+          }),
+        });
+        if (!res.ok) throw new Error();
+        toast.success("Testimonial updated");
+      } else {
+        // CREATE new testimonial
+        const res = await fetch("/api/admin/testimonials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+            rating: Number(form.rating),
+          }),
+        });
+        if (!res.ok) throw new Error();
+        toast.success("Testimonial added");
+      }
       setShowForm(false);
+      setEditingId(null);
       setForm(emptyForm);
       fetchTestimonials();
     } catch {
-      toast.error("Failed to add");
+      toast.error(editingId ? "Failed to update" : "Failed to add");
     } finally {
       setSaving(false);
     }
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm);
   };
 
   if (loading) {
@@ -140,7 +177,7 @@ export default function AdminTestimonialsPage() {
           Testimonials ({testimonials.length})
         </h1>
         {!showForm && (
-          <Button variant="wellness" onClick={() => setShowForm(true)}>
+          <Button variant="wellness" onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true); }}>
             <Plus className="mr-1 h-4 w-4" /> Add
           </Button>
         )}
@@ -149,8 +186,10 @@ export default function AdminTestimonialsPage() {
       {showForm && (
         <Card className="border-0 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base">New Testimonial</CardTitle>
-            <button onClick={() => setShowForm(false)}>
+            <CardTitle className="text-base">
+              {editingId ? "Edit Testimonial" : "New Testimonial"}
+            </CardTitle>
+            <button onClick={cancelForm}>
               <X className="h-5 w-5 text-muted-foreground" />
             </button>
           </CardHeader>
@@ -201,10 +240,19 @@ export default function AdminTestimonialsPage() {
                   rows={3}
                 />
               </div>
-              <div>
+              <div className="flex gap-2">
                 <Button type="submit" variant="wellness" disabled={saving}>
-                  {saving ? "Saving..." : "Add Testimonial"}
+                  {saving
+                    ? "Saving..."
+                    : editingId
+                      ? "Update Testimonial"
+                      : "Add Testimonial"}
                 </Button>
+                {editingId && (
+                  <Button type="button" variant="outline" onClick={cancelForm}>
+                    Cancel
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -249,11 +297,10 @@ export default function AdminTestimonialsPage() {
                     {Array.from({ length: 5 }).map((_, i) => (
                       <Star
                         key={i}
-                        className={`h-3 w-3 ${
-                          i < t.rating
+                        className={`h-3 w-3 ${i < t.rating
                             ? "fill-yellow-400 text-yellow-400"
                             : "text-muted"
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>
@@ -263,12 +310,18 @@ export default function AdminTestimonialsPage() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <button
+                    onClick={() => handleEdit(t)}
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-blue-50 hover:text-blue-600"
+                    title="Edit"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
                     onClick={() => toggleApproved(t._id, t.isApproved)}
-                    className={`rounded-lg p-2 ${
-                      t.isApproved
+                    className={`rounded-lg p-2 ${t.isApproved
                         ? "text-green-500 hover:bg-green-50"
-                        : "text-muted-foreground hover:bg-accent"
-                    }`}
+                        : "text-muted-foreground hover:bg-slate-100"
+                      }`}
                     title={t.isApproved ? "Hide" : "Approve"}
                   >
                     {t.isApproved ? (
