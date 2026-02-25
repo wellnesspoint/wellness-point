@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -42,35 +41,71 @@ const adminLinks = [
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
 ];
 
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [authStatus, setAuthStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
 
   // Allow /admin/login to render without auth
   const isLoginPage = pathname === "/admin/login";
 
+  const checkAdminSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/auth/session");
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        setAdminUser(data.user);
+        setAuthStatus("authenticated");
+      } else {
+        setAdminUser(null);
+        setAuthStatus("unauthenticated");
+      }
+    } catch {
+      setAdminUser(null);
+      setAuthStatus("unauthenticated");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoginPage) {
+      checkAdminSession();
+    }
+  }, [isLoginPage, checkAdminSession]);
+
   useEffect(() => {
     if (isLoginPage) return;
-    if (status === "unauthenticated") {
-      router.push("/admin/login");
-    } else if (status === "authenticated" && (session?.user as any)?.role !== "admin") {
+    if (authStatus === "unauthenticated") {
       router.push("/admin/login");
     }
-  }, [status, session, router, isLoginPage]);
+  }, [authStatus, router, isLoginPage]);
+
+  const handleLogout = async (redirectTo: string) => {
+    await fetch("/api/admin/auth/logout", { method: "POST" });
+    setAdminUser(null);
+    setAuthStatus("unauthenticated");
+    router.push(redirectTo);
+  };
 
   // Login page renders without layout
   if (isLoginPage) {
     return <>{children}</>;
   }
 
-  if (status === "loading") {
+  if (authStatus === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
@@ -81,7 +116,7 @@ export default function AdminLayout({
     );
   }
 
-  if ((session?.user as any)?.role !== "admin") return null;
+  if (authStatus !== "authenticated" || !adminUser) return null;
 
   // Get current page title
   const currentPage = adminLinks.find((l) => l.href === pathname)?.label || "Admin";
@@ -148,7 +183,7 @@ export default function AdminLayout({
           {/* Bottom: Back to Store */}
           <div className="border-t border-border p-3">
             <button
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() => handleLogout("/")}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -181,11 +216,11 @@ export default function AdminLayout({
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-xs font-bold text-white">
-                  {session?.user?.name?.[0]?.toUpperCase() || "A"}
+                  {adminUser?.name?.[0]?.toUpperCase() || "A"}
                 </div>
                 <div className="hidden text-left sm:block">
-                  <p className="text-sm font-medium text-foreground">{session?.user?.name || "Admin"}</p>
-                  <p className="text-[11px] text-muted-foreground">{session?.user?.email}</p>
+                  <p className="text-sm font-medium text-foreground">{adminUser?.name || "Admin"}</p>
+                  <p className="text-[11px] text-muted-foreground">{adminUser?.email}</p>
                 </div>
                 <ChevronDown className="hidden h-4 w-4 text-muted-foreground sm:block" />
               </button>
@@ -198,13 +233,13 @@ export default function AdminLayout({
                   />
                   <div className="absolute right-0 z-50 mt-2 w-48 rounded-xl border border-border bg-popover py-1 shadow-lg">
                     <div className="border-b border-border px-4 py-2">
-                      <p className="text-sm font-medium text-popover-foreground">{session?.user?.name}</p>
-                      <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
+                      <p className="text-sm font-medium text-popover-foreground">{adminUser?.name}</p>
+                      <p className="text-xs text-muted-foreground">{adminUser?.email}</p>
                     </div>
                     <button
                       onClick={() => {
                         setProfileOpen(false);
-                        signOut({ callbackUrl: "/admin/login" });
+                        handleLogout("/admin/login");
                       }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10"
                     >

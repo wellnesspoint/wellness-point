@@ -21,7 +21,6 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        loginType: { label: "Login Type", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -51,13 +50,9 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Account has been deactivated");
         }
 
-        // Route-based login restriction
-        const isAdminLogin = credentials.loginType === "admin";
-        if (user.role === "admin" && !isAdminLogin) {
+        // Admin users must use the admin login page (/admin/login)
+        if (user.role === "admin") {
           throw new Error("Please use the admin login page");
-        }
-        if (user.role !== "admin" && isAdminLogin) {
-          throw new Error("Invalid admin credentials");
         }
 
         return {

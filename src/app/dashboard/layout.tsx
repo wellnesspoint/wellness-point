@@ -37,10 +37,7 @@ export default function DashboardLayout({
     );
   }
 
-  // Block admin users — treat as not logged in on customer pages
-  const isAdmin = (session?.user as any)?.role === "admin";
-
-  if (!session || isAdmin) {
+  if (!session) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <h1 className="text-2xl font-bold text-foreground">Access Denied</h1>

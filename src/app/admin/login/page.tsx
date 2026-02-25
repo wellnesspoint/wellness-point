@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
@@ -23,15 +22,15 @@ export default function AdminLoginPage() {
 
     setLoading(true);
     try {
-      const res = await signIn("credentials", {
-        email,
-        password,
-        loginType: "admin",
-        redirect: false,
+      const res = await fetch("/api/admin/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
+      const data = await res.json();
 
-      if (res?.error) {
-        toast.error(res.error);
+      if (!res.ok) {
+        toast.error(data.error || "Login failed");
       } else {
         toast.success("Welcome to Admin Panel");
         router.push("/admin");
