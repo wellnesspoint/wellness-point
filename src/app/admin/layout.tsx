@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Bell,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 
 const adminLinks = [
@@ -33,6 +34,7 @@ const adminLinks = [
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
   { href: "/admin/reviews", label: "Reviews", icon: Star },
+  { href: "/admin/contacts", label: "Contacts", icon: MessageCircle },
   { href: "/admin/blogs", label: "Blogs", icon: FileText },
   { href: "/admin/testimonials", label: "Testimonials", icon: MessageSquare },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail },

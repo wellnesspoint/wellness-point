@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import connectDB from "@/lib/db";
+import Contact from "@/models/Contact";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, subject, message } = body;
+    const { name, email, phone, subject, message } = body;
 
-    if (!name || !email || !subject || !message) {
+    if (!name || !email || !phone || !subject || !message) {
       return NextResponse.json(
         { error: "All fields are required" },
         { status: 400 }
       );
     }
 
-    // In production, you'd send an email here using a service like
-    // SendGrid, Resend, or Nodemailer. For now, we log the message.
-    console.log("Contact form submission:", { name, email, subject, message });
+    await connectDB();
+
+    await Contact.create({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      subject: subject.trim(),
+      message: message.trim(),
+      status: "new",
+    });
 
     return NextResponse.json(
       { message: "Message sent successfully" },
