@@ -76,3 +76,35 @@ export async function PUT(
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await checkAdmin();
+  if (!session) return unauthorizedResponse();
+
+  const { id } = await params;
+
+  await connectDB();
+
+  try {
+    const user = await User.findById(id);
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (user.role === "admin") {
+      return NextResponse.json(
+        { error: "Cannot delete admin users" },
+        { status: 403 }
+      );
+    }
+
+    await User.findByIdAndDelete(id);
+
+    return NextResponse.json({ message: "User deleted" });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
+  }
+}

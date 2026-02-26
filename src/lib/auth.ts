@@ -72,7 +72,12 @@ export const authOptions: NextAuthOptions = {
 
         const existingUser = await User.findOne({ email: user.email });
 
-        if (!existingUser) {
+        if (existingUser) {
+          // Block signing in if user has been deactivated
+          if (!existingUser.isActive) {
+            return false;
+          }
+        } else {
           await User.create({
             name: user.name,
             email: user.email,
@@ -92,11 +97,24 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
           token.id = dbUser._id.toString();
           token.role = dbUser.role;
+          token.isActive = dbUser.isActive;
+        }
+      } else if (token.email) {
+        // Re-check isActive on every token refresh so blocked users get kicked
+        await connectDB();
+        const dbUser = await User.findOne({ email: token.email });
+        if (dbUser && !dbUser.isActive) {
+          // Return empty token to invalidate session
+          return { ...token, isActive: false };
         }
       }
       return token;
     },
     async session({ session, token }) {
+      if (token.isActive === false) {
+        // Return empty session for blocked users
+        return { ...session, user: undefined } as any;
+      }
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;

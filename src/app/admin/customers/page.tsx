@@ -17,6 +17,7 @@ import {
   Mail,
   Phone,
   Download,
+  Trash2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,26 @@ export default function AdminCustomersPage() {
       toast.success(isActive ? "User blocked" : "User unblocked");
     } catch {
       toast.error("Failed to update user");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, name: string) => {
+    if (!confirm(`Permanently delete ${name || "this user"}? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to delete");
+        return;
+      }
+      setUsers((prev) => prev.filter((u) => u._id !== userId));
+      if (selectedUser?._id === userId) {
+        setSelectedUser(null);
+        setUserOrders([]);
+      }
+      toast.success("User deleted");
+    } catch {
+      toast.error("Failed to delete user");
     }
   };
 
@@ -199,18 +220,28 @@ export default function AdminCustomersPage() {
                 </div>
               </div>
               {u.role !== "admin" && (
-                <Button
-                  variant={u.isActive !== false ? "destructive" : "default"}
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => toggleBlock(u._id, u.isActive !== false)}
-                >
-                  {u.isActive !== false ? (
-                    <><Ban className="mr-1 h-4 w-4" /> Block User</>
-                  ) : (
-                    <><CheckCircle className="mr-1 h-4 w-4" /> Unblock User</>
-                  )}
-                </Button>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant={u.isActive !== false ? "destructive" : "default"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => toggleBlock(u._id, u.isActive !== false)}
+                  >
+                    {u.isActive !== false ? (
+                      <><Ban className="mr-1 h-4 w-4" /> Block User</>
+                    ) : (
+                      <><CheckCircle className="mr-1 h-4 w-4" /> Unblock User</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+                    onClick={() => handleDeleteUser(u._id, u.name)}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" /> Delete
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -252,16 +283,16 @@ export default function AdminCustomersPage() {
                           <td className="py-2 font-semibold text-xs">₹{(order.items?.reduce((s: number, item: any) => s + item.price * item.quantity, 0) + (order.shipping || 0) - (order.discount || 0)).toLocaleString("en-IN")}</td>
                           <td className="py-2">
                             <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" :
-                                order.paymentStatus === "failed" ? "bg-red-100 text-red-700" :
-                                  "bg-yellow-100 text-yellow-700"
+                              order.paymentStatus === "failed" ? "bg-red-100 text-red-700" :
+                                "bg-yellow-100 text-yellow-700"
                               }`}>
                               {order.paymentStatus}
                             </span>
                           </td>
                           <td className="py-2">
                             <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${order.orderStatus === "delivered" ? "bg-green-100 text-green-700" :
-                                order.orderStatus === "cancelled" ? "bg-red-100 text-red-700" :
-                                  "bg-blue-100 text-blue-700"
+                              order.orderStatus === "cancelled" ? "bg-red-100 text-red-700" :
+                                "bg-blue-100 text-blue-700"
                               }`}>
                               {order.orderStatus}
                             </span>
@@ -410,12 +441,21 @@ export default function AdminCustomersPage() {
                         <button
                           onClick={() => toggleBlock(user._id, user.isActive !== false)}
                           className={`rounded-lg p-2 ${user.isActive !== false
-                              ? "text-muted-foreground hover:bg-red-50 hover:text-red-500"
-                              : "text-green-600 hover:bg-green-50"
+                            ? "text-muted-foreground hover:bg-red-50 hover:text-red-500"
+                            : "text-green-600 hover:bg-green-50"
                             }`}
                           title={user.isActive !== false ? "Block" : "Unblock"}
                         >
                           {user.isActive !== false ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                        </button>
+                      )}
+                      {user.role !== "admin" && (
+                        <button
+                          onClick={() => handleDeleteUser(user._id, user.name)}
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-red-50 hover:text-red-500"
+                          title="Delete User"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       )}
                     </div>
