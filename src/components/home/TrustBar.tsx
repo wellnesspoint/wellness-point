@@ -20,7 +20,7 @@ export default function TrustBar() {
             >
                 {doubled.map((item, i) => (
                     <div key={i} className="flex items-center gap-2.5 px-2">
-                        <item.icon className="h-4.5 w-4.5 shrink-0 text-accent-500" />
+                        <item.icon className="h-4.5 w-4.5 shrink-0 text-wellness-600" />
                         <span className="text-sm font-medium text-wellness-800">
                             {item.text}
                         </span>

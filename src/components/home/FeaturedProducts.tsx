@@ -165,22 +165,7 @@ export default function FeaturedProducts() {
         </div>
       )}
 
-      {/* View All CTA */}
-      {!loading && products.length > 0 && (
-        <div className="mt-10 text-center">
-          <Button
-            variant="outline"
-            size="lg"
-            asChild
-            className="border-wellness-300 text-wellness-700 hover:bg-wellness-50"
-          >
-            <Link href="/shop" className="flex items-center gap-2">
-              View All Products
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-          </Button>
-        </div>
-      )}
+
     </section>
   );
 }

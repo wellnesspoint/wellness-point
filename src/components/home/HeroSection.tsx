@@ -9,7 +9,7 @@ export default function HeroSection() {
     <section className="relative overflow-hidden bg-gradient-to-br from-white via-wellness-50/40 to-white">
       {/* Subtle decorative elements */}
       <div className="absolute right-0 top-0 h-[600px] w-[600px] rounded-full bg-wellness-100/40 blur-[120px]" />
-      <div className="absolute -left-20 bottom-0 h-[400px] w-[400px] rounded-full bg-accent-50/50 blur-[100px]" />
+      <div className="absolute -left-20 bottom-0 h-[400px] w-[400px] rounded-full bg-wellness-50/50 blur-[100px]" />
 
       <div className="container relative mx-auto px-4">
         <div className="grid min-h-[72vh] items-center gap-12 lg:grid-cols-2">
@@ -75,7 +75,7 @@ export default function HeroSection() {
                 Lab Tested
               </div>
               <div className="flex items-center gap-2">
-                <svg className="h-5 w-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-5 w-5 text-wellness-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
                 Made in India
@@ -87,7 +87,7 @@ export default function HeroSection() {
           <div className="relative hidden lg:flex lg:items-center lg:justify-center">
             {/* Large decorative circle */}
             <div className="relative h-[480px] w-[480px]">
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-wellness-100 via-wellness-50 to-accent-50 shadow-2xl" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-wellness-100 via-wellness-50 to-wellness-50 shadow-2xl" />
               <div className="absolute inset-4 rounded-full bg-gradient-to-tl from-wellness-50 to-white shadow-inner" />
               {/* Center content */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -134,9 +134,9 @@ export default function HeroSection() {
               </div>
             </div>
 
-            <div className="absolute -right-4 bottom-24 rounded-2xl border border-accent-100 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-sm">
+            <div className="absolute -right-4 bottom-24 rounded-2xl border border-wellness-100 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-sm">
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-50 text-accent-500">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-wellness-50 text-wellness-600">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>

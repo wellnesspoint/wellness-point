@@ -12,7 +12,7 @@ const ingredients = [
         icon: Pill,
         name: "Multivitamin Complex",
         description: "Essential nutrients to support daily energy and immunity.",
-        color: "bg-accent-50 text-accent-600",
+        color: "bg-wellness-50 text-wellness-600",
     },
     {
         icon: Heart,
@@ -48,7 +48,7 @@ export default function IngredientSpotlight() {
                             className="group relative overflow-hidden rounded-2xl border border-border bg-card p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
                         >
                             {/* Subtle gradient overlay on hover */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-wellness-50/0 to-wellness-50/0 transition-all duration-300 group-hover:from-wellness-50/50 group-hover:to-accent-50/30" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-wellness-50/0 to-wellness-50/0 transition-all duration-300 group-hover:from-wellness-50/50 group-hover:to-wellness-50/30" />
 
                             <div className="relative">
                                 <div

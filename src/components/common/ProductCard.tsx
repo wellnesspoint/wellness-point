@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Heart, ShoppingCart, Star, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,11 +33,26 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
   const router = useRouter();
+  const { data: session } = useSession();
+  const [wishlisted, setWishlisted] = useState(false);
+  const [wishLoading, setWishLoading] = useState(false);
 
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
   const discountPercent = hasDiscount
     ? getDiscountPercentage(product.price, product.discountPrice!)
     : 0;
+
+  // Check if already in wishlist on mount
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/wishlist")
+      .then((r) => r.json())
+      .then((data) => {
+        const ids = (data.products || []).map((p: any) => p._id || p);
+        setWishlisted(ids.includes(product._id));
+      })
+      .catch(() => { });
+  }, [session, product._id]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -55,11 +71,30 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
     openCart();
   };
 
-  const handleWishlist = (e: React.MouseEvent) => {
+  const handleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onWishlist?.();
-    toast.success("Added to wishlist");
+    if (!session) {
+      toast.error("Please sign in to add to wishlist");
+      router.push("/login");
+      return;
+    }
+    if (wishLoading) return;
+    setWishLoading(true);
+    try {
+      await fetch("/api/wishlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: product._id }),
+      });
+      setWishlisted(!wishlisted);
+      toast.success(wishlisted ? "Removed from wishlist" : "Added to wishlist");
+      onWishlist?.();
+    } catch {
+      toast.error("Failed to update wishlist");
+    } finally {
+      setWishLoading(false);
+    }
   };
 
   const handleBuyNow = (e: React.MouseEvent) => {
@@ -83,10 +118,12 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
       {/* Wishlist Button */}
       <button
         onClick={handleWishlist}
-        className="absolute right-3 top-3 z-10 rounded-full bg-background/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-all hover:bg-background hover:text-red-500"
-        aria-label="Add to wishlist"
+        disabled={wishLoading}
+        className={`absolute right-3 top-3 z-10 rounded-full bg-background/80 p-2 shadow-sm backdrop-blur-sm transition-all hover:bg-background ${wishlisted ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+          }`}
+        aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
       >
-        <Heart className="h-4 w-4" />
+        <Heart className={`h-4 w-4 ${wishlisted ? "fill-red-500" : ""}`} />
       </button>
 
       {/* Image */}

@@ -17,8 +17,8 @@
     --secondary-foreground: 85 33% 22%;
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
-    --accent: 43 74% 49%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 215 16% 35%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 214 32% 91%;
@@ -55,7 +55,7 @@
   }
 
   .gradient-wellness {
-    @apply bg-gradient-to-br from-wellness-50 via-white to-accent-50;
+    @apply bg-gradient-to-br from-wellness-50 via-white to-wellness-50/50;
   }
 
   .gradient-hero {

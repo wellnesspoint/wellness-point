@@ -119,14 +119,7 @@ export default function Header() {
                       <LayoutDashboard className="h-4 w-4" />
                       Dashboard
                     </Link>
-                    <Link
-                      href="/dashboard/wishlist"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-popover-foreground hover:bg-accent"
-                    >
-                      <Heart className="h-4 w-4" />
-                      Wishlist
-                    </Link>
+
                     {(session.user as any)?.role === "admin" && (
                       <Link
                         href="/admin"

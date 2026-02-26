@@ -24,10 +24,10 @@ const benefits = [
 
 export default function BenefitsSection() {
   return (
-    <section className="bg-gradient-to-b from-wellness-50/50 to-white py-14">
+    <section className="bg-gradient-to-b from-wellness-50/50 to-white py-8">
       <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="mb-14 text-center">
+        <div className="mb-10 text-center">
           <span className="text-sm font-semibold uppercase tracking-wider text-wellness-600">
             Why Us
           </span>
