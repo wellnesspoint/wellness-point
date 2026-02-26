@@ -133,7 +133,7 @@ export default function OrdersPage() {
                         {order.paymentStatus}
                       </span>
                       <p className="text-sm font-bold text-wellness-700">
-                        ₹{order.total.toLocaleString("en-IN")}
+                        ₹{(order.items.reduce((s, item) => s + item.price * item.quantity, 0) + (order.shipping || 0) - (order.discount || 0)).toLocaleString("en-IN")}
                       </p>
                       {expanded ? (
                         <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -181,7 +181,7 @@ export default function OrdersPage() {
                   <div className="mt-4 space-y-1 rounded-lg bg-muted p-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span>₹{order.subtotal.toLocaleString("en-IN")}</span>
+                      <span>₹{order.items.reduce((s, item) => s + item.price * item.quantity, 0).toLocaleString("en-IN")}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Shipping</span>
@@ -199,7 +199,7 @@ export default function OrdersPage() {
                     )}
                     <div className="flex justify-between border-t pt-1 font-bold">
                       <span>Total</span>
-                      <span>₹{order.total.toLocaleString("en-IN")}</span>
+                      <span>₹{(order.items.reduce((s, item) => s + item.price * item.quantity, 0) + (order.shipping || 0) - (order.discount || 0)).toLocaleString("en-IN")}</span>
                     </div>
                   </div>
 
