@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (!session) return unauthorizedResponse();
 
     const body = await req.json();
-    const { title, excerpt, content, coverImage, tags, isPublished, metaTitle, metaDescription } = body;
+    const { title, excerpt, content, coverImage, images, tags, isPublished, metaTitle, metaDescription } = body;
 
     if (!title || !excerpt || !content || !coverImage) {
       return NextResponse.json(
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       excerpt,
       content,
       coverImage,
+      images: images || [],
       tags: tags || [],
       isPublished: isPublished || false,
       metaTitle,

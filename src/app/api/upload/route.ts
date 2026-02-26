@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const files = formData.getAll("files") as File[];
+    const folder = (formData.get("folder") as string) || "products";
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
+    const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
     await mkdir(uploadDir, { recursive: true });
 
     const uploadedUrls: string[] = [];
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       const filePath = path.join(uploadDir, uniqueName);
 
       await writeFile(filePath, buffer);
-      uploadedUrls.push(`/uploads/products/${uniqueName}`);
+      uploadedUrls.push(`/uploads/${folder}/${uniqueName}`);
     }
 
     return NextResponse.json({

@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2, X, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, X, FileText, Upload, ImageIcon } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface Blog {
@@ -17,6 +17,7 @@ interface Blog {
   excerpt: string;
   content: string;
   coverImage: string;
+  images: string[];
   tags: string[];
   isPublished: boolean;
   createdAt: string;
@@ -27,6 +28,7 @@ const emptyBlog = {
   excerpt: "",
   content: "",
   coverImage: "",
+  images: [] as string[],
   tags: "",
   isPublished: true,
 };
@@ -38,6 +40,9 @@ export default function AdminBlogsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyBlog);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const fetchBlogs = async () => {
     try {
@@ -67,6 +72,7 @@ export default function AdminBlogsPage() {
       excerpt: blog.excerpt,
       content: blog.content,
       coverImage: blog.coverImage || "",
+      images: blog.images || [],
       tags: blog.tags.join(", "),
       isPublished: blog.isPublished,
     });
@@ -86,10 +92,69 @@ export default function AdminBlogsPage() {
     }
   };
 
+  const uploadImages = async (files: FileList): Promise<string[]> => {
+    const formData = new FormData();
+    Array.from(files).forEach((f) => formData.append("files", f));
+    formData.append("folder", "blogs");
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    if (!res.ok) throw new Error("Upload failed");
+    const data = await res.json();
+    return data.urls || [];
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const urls = await uploadImages(files);
+      if (urls.length > 0) {
+        setForm((prev) => ({ ...prev, coverImage: urls[0] }));
+        toast.success("Cover image uploaded");
+      }
+    } catch {
+      toast.error("Failed to upload image");
+    } finally {
+      setUploading(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (form.images.length + files.length > 3) {
+      toast.error("Maximum 3 gallery images allowed");
+      return;
+    }
+    setUploading(true);
+    try {
+      const urls = await uploadImages(files);
+      setForm((prev) => ({ ...prev, images: [...prev.images, ...urls] }));
+      toast.success("Images uploaded");
+    } catch {
+      toast.error("Failed to upload images");
+    } finally {
+      setUploading(false);
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
+    }
+  };
+
+  const removeGalleryImage = (idx: number) => {
+    setForm((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== idx),
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.content) {
       toast.error("Title and content are required");
+      return;
+    }
+    if (!form.coverImage) {
+      toast.error("Cover image is required");
       return;
     }
 
@@ -98,6 +163,7 @@ export default function AdminBlogsPage() {
       excerpt: form.excerpt,
       content: form.content,
       coverImage: form.coverImage,
+      images: form.images,
       tags: form.tags
         .split(",")
         .map((s) => s.trim())
@@ -195,14 +261,76 @@ export default function AdminBlogsPage() {
                   rows={8}
                 />
               </div>
+
+              {/* Cover Image Upload */}
               <div>
-                <Label>Cover Image URL</Label>
-                <Input
-                  value={form.coverImage}
-                  onChange={(e) =>
-                    setForm({ ...form, coverImage: e.target.value })
-                  }
-                />
+                <Label>Cover Image *</Label>
+                {form.coverImage ? (
+                  <div className="relative mt-2 inline-block">
+                    <img
+                      src={form.coverImage}
+                      alt="Cover"
+                      className="h-40 w-full max-w-sm rounded-lg border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, coverImage: "" })}
+                      className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white shadow"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 p-6 text-sm text-muted-foreground transition-colors hover:border-wellness-400 hover:text-wellness-600">
+                    <Upload className="h-5 w-5" />
+                    {uploading ? "Uploading..." : "Click to upload cover image"}
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleCoverUpload}
+                      disabled={uploading}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Gallery Images Upload */}
+              <div>
+                <Label>Gallery Images (up to 3)</Label>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {form.images.map((img, idx) => (
+                    <div key={idx} className="relative">
+                      <img
+                        src={img}
+                        alt={`Gallery ${idx + 1}`}
+                        className="h-24 w-24 rounded-lg border object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryImage(idx)}
+                        className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white shadow"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {form.images.length < 3 && (
+                    <label className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 text-muted-foreground transition-colors hover:border-wellness-400 hover:text-wellness-600">
+                      <ImageIcon className="h-6 w-6" />
+                      <input
+                        ref={galleryInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleGalleryUpload}
+                        disabled={uploading}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
               <div>
                 <Label>Tags (comma separated)</Label>
@@ -230,8 +358,8 @@ export default function AdminBlogsPage() {
                   {saving
                     ? "Saving..."
                     : editId
-                    ? "Update Blog"
-                    : "Create Blog"}
+                      ? "Update Blog"
+                      : "Create Blog"}
                 </Button>
               </div>
             </form>
@@ -273,11 +401,10 @@ export default function AdminBlogsPage() {
                       {new Date(blog.createdAt).toLocaleDateString("en-IN")}
                     </span>
                     <span
-                      className={`rounded-full px-2 py-0.5 font-medium ${
-                        blog.isPublished
+                      className={`rounded-full px-2 py-0.5 font-medium ${blog.isPublished
                           ? "bg-green-100 text-green-700"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                        }`}
                     >
                       {blog.isPublished ? "Published" : "Draft"}
                     </span>

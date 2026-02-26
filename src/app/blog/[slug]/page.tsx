@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams, notFound } from "next/navigation";
+import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Calendar, ArrowLeft, User } from "lucide-react";
+import { Calendar, ArrowLeft, User, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,6 +15,7 @@ interface BlogPost {
     excerpt: string;
     content: string;
     coverImage: string;
+    images: string[];
     author: string;
     tags: string[];
     createdAt: string;
@@ -26,6 +27,7 @@ export default function BlogDetailPage() {
     const [post, setPost] = useState<BlogPost | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [currentSlide, setCurrentSlide] = useState(0);
 
     useEffect(() => {
         if (!slug) return;
@@ -46,6 +48,19 @@ export default function BlogDetailPage() {
         }
         fetchPost();
     }, [slug]);
+
+    // Build carousel images: cover + gallery images
+    const allImages = post
+        ? [post.coverImage, ...(post.images || [])].filter(Boolean)
+        : [];
+
+    const nextSlide = () => {
+        setCurrentSlide((prev) => (prev + 1) % allImages.length);
+    };
+
+    const prevSlide = () => {
+        setCurrentSlide((prev) => (prev - 1 + allImages.length) % allImages.length);
+    };
 
     if (loading) {
         return (
@@ -100,17 +115,56 @@ export default function BlogDetailPage() {
                     Back to Blog
                 </Link>
 
-                {/* Cover Image */}
-                <div className="relative mb-8 aspect-video overflow-hidden rounded-2xl shadow-lg">
-                    <Image
-                        src={post.coverImage}
-                        alt={post.title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, 768px"
-                        priority
-                    />
-                </div>
+                {/* Image Carousel */}
+                {allImages.length > 0 && (
+                    <div className="relative mb-8 overflow-hidden rounded-2xl shadow-lg">
+                        <div className="relative aspect-video">
+                            <Image
+                                src={allImages[currentSlide]}
+                                alt={`${post.title} - Image ${currentSlide + 1}`}
+                                fill
+                                className="object-cover transition-all duration-500"
+                                sizes="(max-width: 768px) 100vw, 768px"
+                                priority
+                            />
+                        </div>
+
+                        {/* Navigation arrows (only show if multiple images) */}
+                        {allImages.length > 1 && (
+                            <>
+                                <button
+                                    onClick={prevSlide}
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                                    aria-label="Previous image"
+                                >
+                                    <ChevronLeft className="h-5 w-5" />
+                                </button>
+                                <button
+                                    onClick={nextSlide}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                                    aria-label="Next image"
+                                >
+                                    <ChevronRight className="h-5 w-5" />
+                                </button>
+
+                                {/* Dots indicator */}
+                                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
+                                    {allImages.map((_, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setCurrentSlide(idx)}
+                                            className={`h-2 rounded-full transition-all ${idx === currentSlide
+                                                    ? "w-6 bg-white"
+                                                    : "w-2 bg-white/50 hover:bg-white/80"
+                                                }`}
+                                            aria-label={`Go to image ${idx + 1}`}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
 
                 {/* Tags */}
                 {post.tags?.length > 0 && (
