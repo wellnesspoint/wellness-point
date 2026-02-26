@@ -3,8 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Mail, Search } from "lucide-react";
+import { Mail, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import toast from "react-hot-toast";
 
 interface Subscriber {
   _id: string;
@@ -22,13 +23,32 @@ export default function AdminNewsletterPage() {
     fetch("/api/admin/newsletter")
       .then((r) => r.json())
       .then((d) => setSubscribers(d.subscribers || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
   const filtered = subscribers.filter((s) =>
     s.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleDelete = async (id: string, email: string) => {
+    if (!confirm(`Delete ${email} from newsletter?`)) return;
+    try {
+      const res = await fetch("/api/admin/newsletter", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        setSubscribers((prev) => prev.filter((s) => s._id !== id));
+        toast.success("Subscriber deleted");
+      } else {
+        toast.error("Failed to delete");
+      }
+    } catch {
+      toast.error("Something went wrong");
+    }
+  };
 
   if (loading) {
     return (
@@ -74,6 +94,7 @@ export default function AdminNewsletterPage() {
                 <th className="pb-3 font-medium">Email</th>
                 <th className="pb-3 font-medium">Status</th>
                 <th className="pb-3 font-medium">Subscribed</th>
+                <th className="pb-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -85,11 +106,10 @@ export default function AdminNewsletterPage() {
                   </td>
                   <td className="py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        sub.isActive !== false
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${sub.isActive !== false
                           ? "bg-green-100 text-green-700"
                           : "bg-red-100 text-red-700"
-                      }`}
+                        }`}
                     >
                       {sub.isActive !== false ? "Active" : "Unsubscribed"}
                     </span>
@@ -103,6 +123,15 @@ export default function AdminNewsletterPage() {
                         year: "2-digit",
                       }
                     )}
+                  </td>
+                  <td className="py-3 text-right">
+                    <button
+                      onClick={() => handleDelete(sub._id, sub.email)}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
+                      title="Delete subscriber"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </td>
                 </tr>
               ))}

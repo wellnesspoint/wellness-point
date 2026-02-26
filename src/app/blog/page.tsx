@@ -57,52 +57,50 @@ export default function BlogPage() {
         ) : posts.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
-              <Card
-                key={post._id}
-                className="group overflow-hidden border-0 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className="relative aspect-video overflow-hidden">
-                  <Image
-                    src={post.coverImage}
-                    alt={post.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  />
-                </div>
-                <div className="p-5">
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    {post.tags?.slice(0, 2).map((tag: string) => (
-                      <Badge key={tag} variant="success" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
+              <Link key={post._id} href={`/blog/${post.slug}`}>
+                <Card
+                  className="group overflow-hidden border-0 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg h-full"
+                >
+                  <div className="relative aspect-video overflow-hidden">
+                    <Image
+                      src={post.coverImage}
+                      alt={post.title}
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-110"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    />
                   </div>
-                  <h2 className="mb-2 font-heading text-lg font-semibold text-card-foreground line-clamp-2 group-hover:text-wellness-600">
-                    {post.title}
-                  </h2>
-                  <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
-                    {post.excerpt}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(post.createdAt).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                  <div className="p-5">
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {post.tags?.slice(0, 2).map((tag: string) => (
+                        <Badge key={tag} variant="success" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
                     </div>
-                    <Link
-                      href={`/blog/${post.slug}`}
-                      className="flex items-center gap-1 text-xs font-medium text-wellness-600 hover:text-wellness-700"
-                    >
-                      Read More
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
+                    <h2 className="mb-2 font-heading text-lg font-semibold text-card-foreground line-clamp-2 group-hover:text-wellness-600">
+                      {post.title}
+                    </h2>
+                    <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
+                      {post.excerpt}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(post.createdAt).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </div>
+                      <span className="flex items-center gap-1 text-xs font-medium text-wellness-600">
+                        Read More
+                        <ArrowRight className="h-3 w-3" />
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              </Link>
             ))}
           </div>
         ) : (
