@@ -21,7 +21,6 @@ const reviewSchema = new Schema<IReview>(
       type: Schema.Types.ObjectId,
       ref: "Product",
       required: true,
-      index: true,
     },
     user: { type: Schema.Types.ObjectId, ref: "User" },
     name: { type: String, required: true, trim: true },

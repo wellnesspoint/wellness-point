@@ -55,7 +55,6 @@ const productSchema = new Schema<IProduct>(
   }
 );
 
-productSchema.index({ slug: 1 });
 productSchema.index({ isFeatured: 1, isActive: 1 });
 
 const Product: Model<IProduct> =

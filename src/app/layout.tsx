@@ -60,8 +60,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${poppins.variable}`} suppressHydrationWarning>
       <head>
-        <meta name="msapplication-TileColor" content="#ffffff" />
-        <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="msapplication-TileColor" content="#358e53" />
+        <meta name="msapplication-TileImage" content="/favicon.png" />
         <meta name="theme-color" content="#358e53" />
       </head>
       <body className="min-h-screen font-sans">

@@ -17,8 +17,6 @@ const wishlistSchema = new Schema<IWishlist>(
   }
 );
 
-wishlistSchema.index({ user: 1 });
-
 const Wishlist: Model<IWishlist> =
   mongoose.models.Wishlist ||
   mongoose.model<IWishlist>("Wishlist", wishlistSchema);

@@ -35,7 +35,6 @@ const blogSchema = new Schema<IBlog>(
   }
 );
 
-blogSchema.index({ slug: 1 });
 blogSchema.index({ isPublished: 1, createdAt: -1 });
 
 const Blog: Model<IBlog> =
