@@ -151,11 +151,16 @@ export default function CheckoutPage() {
     setProcessing(true);
 
     try {
-      // Create Razorpay order
+      // Create Razorpay order — server validates prices & stock
       const createRes = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: total }),
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            _id: item._id,
+            quantity: item.quantity,
+          })),
+        }),
       });
 
       const orderData = await createRes.json();
@@ -173,7 +178,7 @@ export default function CheckoutPage() {
         order_id: orderData.orderId,
         handler: async function (response: any) {
           try {
-            // Verify payment
+            // Verify payment — server recalculates totals and decrements stock
             const verifyRes = await fetch("/api/payment/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -184,16 +189,9 @@ export default function CheckoutPage() {
                 orderData: {
                   items: items.map((item) => ({
                     product: item._id,
-                    name: item.name,
-                    image: item.image,
-                    price: item.price,
                     quantity: item.quantity,
                   })),
                   shippingAddress: address,
-                  subtotal,
-                  shipping,
-                  discount: 0,
-                  total,
                 },
               }),
             });

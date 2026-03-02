@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Contact from "@/models/Contact";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
+import { sendContactReply } from "@/lib/email";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -39,6 +40,17 @@ export async function PUT(req: NextRequest, { params }: Props) {
         { error: "Contact not found" },
         { status: 404 }
       );
+    }
+
+    // Send reply email if admin replied
+    if (body.adminReply && contact.email) {
+      sendContactReply({
+        customerName: contact.name,
+        customerEmail: contact.email,
+        originalSubject: contact.subject,
+        originalMessage: contact.message,
+        adminReply: body.adminReply,
+      }).catch(() => {}); // Don't fail the update if email fails
     }
 
     return NextResponse.json({ contact });

@@ -2,9 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import NewsletterSubscriber from "@/models/NewsletterSubscriber";
 import { isValidEmail, sanitizeInput } from "@/lib/utils";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 3 subscription attempts per 15 minutes per IP
+    const ip = getClientIp(req);
+    const { success: withinLimit } = rateLimit(`newsletter:${ip}`, {
+      limit: 3,
+      windowMs: 15 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { email } = body;
 

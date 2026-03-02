@@ -3,9 +3,23 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import { signAdminToken, getAdminCookieName } from "@/lib/admin-auth";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
     try {
+        // Rate limit: 5 login attempts per 15 minutes per IP
+        const ip = getClientIp(req);
+        const { success: withinLimit } = rateLimit(`admin-login:${ip}`, {
+            limit: 5,
+            windowMs: 15 * 60 * 1000,
+        });
+        if (!withinLimit) {
+            return NextResponse.json(
+                { error: "Too many login attempts. Please try again in 15 minutes." },
+                { status: 429 }
+            );
+        }
+
         const { email, password } = await req.json();
 
         if (!email || !password) {
