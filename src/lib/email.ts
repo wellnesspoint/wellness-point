@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { generateInvoicePDF, InvoiceOrderData } from "./invoice";
 
 /**
  * Email service for Wellness Point.
@@ -40,6 +41,17 @@ interface OrderEmailData {
   subtotal: number;
   shipping: number;
   total: number;
+  // Extra fields for invoice PDF generation
+  shippingAddress?: {
+    fullName: string;
+    phone?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  };
+  discount?: number;
+  createdAt?: string | Date;
 }
 
 function formatOrderId(id: string): string {
@@ -100,12 +112,40 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
     </div>
   `;
 
+  // Generate invoice PDF attachment
+  const orderId8 = data.orderId.slice(-8).toUpperCase();
+  let attachments: { filename: string; content: Buffer; contentType: string }[] = [];
+  try {
+    const invoiceData: InvoiceOrderData = {
+      _id: data.orderId,
+      createdAt: data.createdAt || new Date(),
+      paymentStatus: "paid",
+      items: data.items,
+      shippingAddress: data.shippingAddress || { fullName: data.customerName },
+      userEmail: data.customerEmail,
+      userName: data.customerName,
+      shipping: data.shipping,
+      discount: data.discount || 0,
+    };
+    const pdfBuffer = generateInvoicePDF(invoiceData);
+    attachments = [
+      {
+        filename: `Invoice-WP-${orderId8}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ];
+  } catch (err) {
+    console.error("Failed to generate invoice PDF for email:", err);
+  }
+
   try {
     await transporter.sendMail({
       from: FROM_ADDRESS,
       to: data.customerEmail,
       subject: `Order Confirmed — ${formatOrderId(data.orderId)} | Wellness Point`,
       html,
+      attachments,
     });
   } catch (error) {
     console.error("Failed to send order confirmation email:", error);

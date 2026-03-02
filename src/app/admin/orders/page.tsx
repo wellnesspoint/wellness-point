@@ -36,6 +36,7 @@ interface Order {
   items: OrderItem[];
   shippingAddress: {
     fullName: string;
+    email?: string;
     phone: string;
     street: string;
     city: string;
@@ -191,8 +192,9 @@ async function downloadInvoice(order: Order) {
     doc.text(`Phone: ${order.shippingAddress.phone}`, M, y);
     y += 4;
   }
-  if (order.user?.email) {
-    doc.text(`Email: ${order.user.email}`, M, y);
+  const invoiceEmail = order.shippingAddress?.email || order.user?.email;
+  if (invoiceEmail) {
+    doc.text(`Email: ${invoiceEmail}`, M, y);
     y += 4;
   }
   doc.text(
@@ -462,6 +464,7 @@ export default function AdminOrdersPage() {
       (o) =>
         o._id.toLowerCase().includes(search.toLowerCase()) ||
         o.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        o.shippingAddress?.email?.toLowerCase().includes(search.toLowerCase()) ||
         o.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
         o.shippingAddress?.fullName?.toLowerCase().includes(search.toLowerCase())
     );
@@ -765,7 +768,7 @@ export default function AdminOrdersPage() {
                       {order.user?.name || order.shippingAddress?.fullName || "—"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {order.user?.email || ""}
+                      {order.shippingAddress?.email || order.user?.email || ""}
                     </p>
                   </td>
                   <td className="py-3 text-muted-foreground">

@@ -155,18 +155,23 @@ export async function POST(req: NextRequest) {
     });
 
     // 6. Send order confirmation email (non-blocking)
+    // Use the email from the checkout form (shippingAddress.email), not the account email
+    const recipientEmail = orderData.shippingAddress?.email || session.user?.email || "";
     sendOrderConfirmation({
       customerName: orderData.shippingAddress?.fullName || session.user?.name || "Customer",
-      customerEmail: session.user?.email || "",
+      customerEmail: recipientEmail,
       orderId: order._id.toString(),
       items: verifiedItems.map((item) => ({
         name: item.name,
         quantity: item.quantity,
-        price: item.price * item.quantity,
+        price: item.price,
       })),
       subtotal,
       shipping,
       total,
+      shippingAddress: orderData.shippingAddress,
+      discount: 0,
+      createdAt: order.createdAt,
     }).catch(() => {}); // Don't fail the order if email fails
 
     return NextResponse.json({
