@@ -42,6 +42,10 @@ interface OrderEmailData {
   total: number;
 }
 
+function formatOrderId(id: string): string {
+  return `#${id.slice(-8).toUpperCase()}`;
+}
+
 export async function sendOrderConfirmation(data: OrderEmailData) {
   const transporter = getTransporter();
   if (!transporter) return;
@@ -66,7 +70,7 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
         <h2 style="color:#065f46">Order Confirmed! 🎉</h2>
         <p>Hi <strong>${data.customerName}</strong>,</p>
         <p>Thank you for your order. Here's your order summary:</p>
-        <p style="color:#6b7280;font-size:14px">Order ID: <strong>${data.orderId}</strong></p>
+        <p style="color:#6b7280;font-size:14px">Order ID: <strong>${formatOrderId(data.orderId)}</strong></p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0">
           <thead>
             <tr style="background:#065f46;color:#fff">
@@ -100,7 +104,7 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
     await transporter.sendMail({
       from: FROM_ADDRESS,
       to: data.customerEmail,
-      subject: `Order Confirmed — ${data.orderId} | Wellness Point`,
+      subject: `Order Confirmed — ${formatOrderId(data.orderId)} | Wellness Point`,
       html,
     });
   } catch (error) {
