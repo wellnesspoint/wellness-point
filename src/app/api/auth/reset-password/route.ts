@@ -44,7 +44,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Hash new password and save
+    // Also mark email as verified — clicking a reset link proves email ownership
     user.password = await bcrypt.hash(password, 12);
+    user.emailVerified = true;
+    user.emailVerifyToken = undefined;
+    user.emailVerifyExpires = undefined;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();

@@ -22,13 +22,27 @@ export async function GET(req: NextRequest) {
       .update(token)
       .digest("hex");
 
+    // First find user by email and token (without expiry check)
     const user = await User.findOne({
       email: email.toLowerCase(),
       emailVerifyToken: hashedToken,
-      emailVerifyExpires: { $gt: new Date() },
     });
 
     if (!user) {
+      // Check if user is already verified
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser?.emailVerified) {
+        return NextResponse.redirect(
+          new URL("/login?verified=true", req.url)
+        );
+      }
+      return NextResponse.redirect(
+        new URL("/login?error=invalid-verification", req.url)
+      );
+    }
+
+    // Check expiry separately for a clearer error
+    if (user.emailVerifyExpires && user.emailVerifyExpires < new Date()) {
       return NextResponse.redirect(
         new URL("/login?error=expired-verification", req.url)
       );

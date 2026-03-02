@@ -32,17 +32,27 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      provider: "credentials",
-    });
+    // Check if user exists with any provider first
+    const anyUser = await User.findOne({ email: email.toLowerCase() });
 
-    // Always return success even if user not found (prevents email enumeration)
-    if (!user) {
+    if (!anyUser) {
+      // Return generic success to prevent email enumeration
       return NextResponse.json({
         message: "If an account with that email exists, a reset link has been sent.",
       });
     }
+
+    // If the user signed up via Google/Facebook, they can't reset a password
+    if (anyUser.provider !== "credentials") {
+      return NextResponse.json(
+        {
+          error: `This account uses ${anyUser.provider.charAt(0).toUpperCase() + anyUser.provider.slice(1)} sign-in. Please log in with ${anyUser.provider.charAt(0).toUpperCase() + anyUser.provider.slice(1)} instead.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const user = anyUser;
 
     // Generate a secure token
     const resetToken = crypto.randomBytes(32).toString("hex");
@@ -59,12 +69,20 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wellness-point.in";
     const resetUrl = `${baseUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
 
-    // Send email (non-blocking)
-    sendPasswordResetEmail({
-      customerName: user.name,
-      customerEmail: user.email,
-      resetUrl,
-    }).catch((err) => console.error("Failed to send reset email:", err));
+    // Send email (await to catch failures)
+    try {
+      await sendPasswordResetEmail({
+        customerName: user.name,
+        customerEmail: user.email,
+        resetUrl,
+      });
+    } catch (err) {
+      console.error("Failed to send reset email:", err);
+      return NextResponse.json(
+        { error: "Failed to send reset email. Please try again later." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       message: "If an account with that email exists, a reset link has been sent.",

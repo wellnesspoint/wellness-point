@@ -19,6 +19,8 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("verified") === "true") {
@@ -27,10 +29,41 @@ function LoginForm() {
     if (searchParams.get("registered") === "true") {
       toast.success("Account created! Check your email to verify your account.");
     }
-    if (searchParams.get("error") === "expired-verification") {
-      toast.error("Verification link has expired. Please register again.");
+    const err = searchParams.get("error");
+    if (err === "expired-verification") {
+      toast.error("Verification link has expired. Use 'Resend' below to get a new one.");
+      setShowResendVerification(true);
+    }
+    if (err === "invalid-verification") {
+      toast.error("Invalid verification link.");
     }
   }, [searchParams]);
+
+  const handleResendVerification = async () => {
+    if (!form.email) {
+      toast.error("Enter your email above, then click Resend.");
+      return;
+    }
+    setResending(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Verification email sent!");
+        setShowResendVerification(false);
+      } else {
+        toast.error(data.error || "Failed to resend");
+      }
+    } catch {
+      toast.error("Something went wrong");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleCredentialLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +78,9 @@ function LoginForm() {
 
       if (result?.error) {
         toast.error(result.error);
+        if (result.error.toLowerCase().includes("verify your email")) {
+          setShowResendVerification(true);
+        }
       } else {
         toast.success("Welcome back!");
         router.push("/dashboard");
@@ -175,7 +211,19 @@ function LoginForm() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              {showResendVerification ? (
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                >
+                  {resending ? "Sending..." : "Resend verification email"}
+                </button>
+              ) : (
+                <span />
+              )}
               <Link
                 href="/forgot-password"
                 className="text-sm text-wellness-600 hover:text-wellness-700"

@@ -214,7 +214,9 @@ interface PasswordResetData {
 
 export async function sendPasswordResetEmail(data: PasswordResetData) {
   const transporter = getTransporter();
-  if (!transporter) return;
+  if (!transporter) {
+    throw new Error("SMTP not configured — cannot send password reset email");
+  }
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
@@ -243,16 +245,12 @@ export async function sendPasswordResetEmail(data: PasswordResetData) {
     </div>
   `;
 
-  try {
-    await transporter.sendMail({
-      from: FROM_ADDRESS,
-      to: data.customerEmail,
-      subject: "Reset Your Password | Wellness Point",
-      html,
-    });
-  } catch (error) {
-    console.error("Failed to send password reset email:", error);
-  }
+  await transporter.sendMail({
+    from: FROM_ADDRESS,
+    to: data.customerEmail,
+    subject: "Reset Your Password | Wellness Point",
+    html,
+  });
 }
 
 // ─── Email Verification ──────────────────────────────────────────
