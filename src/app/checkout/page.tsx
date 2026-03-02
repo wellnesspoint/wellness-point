@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cart";
@@ -35,16 +35,40 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, getSubtotal, clearCart, removeItem, updateQuantity } = useCartStore();
 
-  const [address, setAddress] = useState<Address>({
-    fullName: "",
-    email: "",
-    phone: "",
-    street: "",
-    addressLine2: "",
-    city: "",
-    state: "",
-    pincode: "",
-  });
+  const STORAGE_KEY = "checkout-address";
+
+  // Restore address from sessionStorage on mount
+  const getInitialAddress = (): Address => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {
+      fullName: "",
+      email: "",
+      phone: "",
+      street: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      pincode: "",
+    };
+  };
+
+  const [address, setAddress] = useState<Address>(getInitialAddress);
+
+  // Persist address to sessionStorage whenever it changes
+  const updateAddress = useCallback((updater: Address | ((prev: Address) => Address)) => {
+    setAddress((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [processing, setProcessing] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
@@ -74,7 +98,7 @@ export default function CheckoutPage() {
     document.body.appendChild(script);
   }, []);
 
-  // Load saved addresses & profile data
+  // Load saved addresses & profile data (only if no cached form data)
   useEffect(() => {
     if (session) {
       fetch("/api/user/profile")
@@ -83,9 +107,14 @@ export default function CheckoutPage() {
           const user = d.user || {};
           const addrs = user.addresses || [];
           setSavedAddresses(addrs);
+
+          // Only prefill from profile/saved address if user hasn't already typed something
+          const hasCachedData = sessionStorage.getItem(STORAGE_KEY);
+          if (hasCachedData) return;
+
           const defaultAddr = addrs.find((a: any) => a.isDefault) || addrs[0];
           if (defaultAddr) {
-            setAddress({
+            updateAddress({
               fullName: defaultAddr.fullName || user.name || "",
               email: defaultAddr.email || user.email || session?.user?.email || "",
               phone: defaultAddr.phone || user.phone || "",
@@ -97,7 +126,7 @@ export default function CheckoutPage() {
             });
           } else {
             // No saved address — prefill from profile
-            setAddress((prev) => ({
+            updateAddress((prev) => ({
               ...prev,
               fullName: user.name || "",
               email: user.email || session?.user?.email || "",
@@ -107,7 +136,7 @@ export default function CheckoutPage() {
         })
         .catch(() => {});
     }
-  }, [session]);
+  }, [session, updateAddress]);
 
   const validateAddress = () => {
     if (
@@ -200,6 +229,7 @@ export default function CheckoutPage() {
 
             if (verifyData.success) {
               clearCart();
+              try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
               toast.success("Order placed successfully!");
               router.push("/dashboard/orders");
             } else {
@@ -282,7 +312,7 @@ export default function CheckoutPage() {
                   <button
                     key={idx}
                     onClick={() =>
-                      setAddress({
+                      updateAddress({
                         fullName: a.fullName,
                         email: a.email || session?.user?.email || "",
                         phone: a.phone,
@@ -320,7 +350,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.fullName}
                     onChange={(e) =>
-                      setAddress({ ...address, fullName: e.target.value })
+                      updateAddress({ ...address, fullName: e.target.value })
                     }
                     placeholder="Enter your full name"
                   />
@@ -331,7 +361,7 @@ export default function CheckoutPage() {
                     type="email"
                     value={address.email}
                     onChange={(e) =>
-                      setAddress({ ...address, email: e.target.value })
+                      updateAddress({ ...address, email: e.target.value })
                     }
                     placeholder="Enter your email address"
                   />
@@ -341,7 +371,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.phone}
                     onChange={(e) =>
-                      setAddress({ ...address, phone: e.target.value })
+                      updateAddress({ ...address, phone: e.target.value })
                     }
                     placeholder="Enter your phone number"
                   />
@@ -351,7 +381,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.street}
                     onChange={(e) =>
-                      setAddress({ ...address, street: e.target.value })
+                      updateAddress({ ...address, street: e.target.value })
                     }
                     placeholder="Enter your address"
                   />
@@ -361,7 +391,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.addressLine2}
                     onChange={(e) =>
-                      setAddress({ ...address, addressLine2: e.target.value })
+                      updateAddress({ ...address, addressLine2: e.target.value })
                     }
                     placeholder="Apartment, suite, landmark, etc."
                   />
@@ -371,7 +401,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.city}
                     onChange={(e) =>
-                      setAddress({ ...address, city: e.target.value })
+                      updateAddress({ ...address, city: e.target.value })
                     }
                     placeholder="Enter your city"
                   />
@@ -381,7 +411,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.state}
                     onChange={(e) =>
-                      setAddress({ ...address, state: e.target.value })
+                      updateAddress({ ...address, state: e.target.value })
                     }
                     placeholder="Enter your state"
                   />
@@ -392,7 +422,7 @@ export default function CheckoutPage() {
                     value={address.pincode}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                      setAddress({ ...address, pincode: val });
+                      updateAddress({ ...address, pincode: val });
                     }}
                     placeholder="Enter your pincode"
                     maxLength={6}
