@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { sanitizeInput, isValidEmail } from "@/lib/utils";
+import { sendEmailVerification } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,17 +44,37 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Generate email verification token
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const hashedVerifyToken = crypto
+      .createHash("sha256")
+      .update(verifyToken)
+      .digest("hex");
+
     const user = await User.create({
       name: sanitizeInput(name),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
       provider: "credentials",
       role: "user",
+      emailVerified: false,
+      emailVerifyToken: hashedVerifyToken,
+      emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
+
+    // Send verification email (non-blocking)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wellness-point.in";
+    const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verifyToken}&email=${encodeURIComponent(user.email)}`;
+
+    sendEmailVerification({
+      customerName: user.name,
+      customerEmail: user.email,
+      verifyUrl,
+    }).catch((err) => console.error("Failed to send verification email:", err));
 
     return NextResponse.json(
       {
-        message: "Account created successfully",
+        message: "Account created! Please check your email to verify your account.",
         user: {
           id: user._id,
           name: user.name,

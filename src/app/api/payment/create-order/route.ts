@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import razorpay from "@/lib/razorpay";
 import connectDB from "@/lib/db";
 import Product from "@/models/Product";
+import ShippingSettings from "@/models/ShippingSettings";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 /**
@@ -99,8 +100,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Shipping: free if subtotal >= 999, else ₹99
-    const shipping = subtotal >= 999 ? 0 : 99;
+    // Shipping — use admin settings
+    let shipping = 50; // fallback
+    try {
+      const shippingConfig = await ShippingSettings.findOne().lean();
+      if (shippingConfig) {
+        if (shippingConfig.enableFreeShipping && subtotal >= shippingConfig.freeShippingThreshold) {
+          shipping = 0;
+        } else {
+          shipping = shippingConfig.flatRate;
+        }
+      } else {
+        shipping = subtotal >= 999 ? 0 : 99;
+      }
+    } catch {
+      shipping = subtotal >= 999 ? 0 : 99;
+    }
     const total = Math.round((subtotal + shipping) * 100) / 100;
 
     if (total < 1) {

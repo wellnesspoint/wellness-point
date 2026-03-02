@@ -50,6 +50,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Account has been deactivated");
         }
 
+        // Check email verification for credentials users
+        if (!user.emailVerified) {
+          throw new Error("Please verify your email before signing in. Check your inbox.");
+        }
+
         // Admin users must use the admin login page (/admin/login)
         if (user.role === "admin") {
           throw new Error("Please use the admin login page");
@@ -77,6 +82,11 @@ export const authOptions: NextAuthOptions = {
           if (!existingUser.isActive) {
             return false;
           }
+          // Auto-verify email for OAuth users
+          if (!existingUser.emailVerified) {
+            existingUser.emailVerified = true;
+            await existingUser.save();
+          }
         } else {
           await User.create({
             name: user.name,
@@ -85,6 +95,7 @@ export const authOptions: NextAuthOptions = {
             provider: account.provider,
             providerId: account.providerAccountId,
             role: "user",
+            emailVerified: true,
           });
         }
       }

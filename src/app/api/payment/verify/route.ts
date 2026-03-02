@@ -5,6 +5,7 @@ import { verifyRazorpaySignature } from "@/lib/razorpay";
 import connectDB from "@/lib/db";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
+import ShippingSettings from "@/models/ShippingSettings";
 import { sendOrderConfirmation } from "@/lib/email";
 
 /**
@@ -104,8 +105,24 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const shipping = subtotal >= 999 ? 0 : 99;
-    const total = Math.round((subtotal + shipping) * 100) / 100;
+    // Use admin shipping settings instead of hardcoded values
+    let shippingCost = 50; // fallback
+    try {
+      const shippingConfig = await ShippingSettings.findOne().lean();
+      if (shippingConfig) {
+        if (shippingConfig.enableFreeShipping && subtotal >= shippingConfig.freeShippingThreshold) {
+          shippingCost = 0;
+        } else {
+          shippingCost = shippingConfig.flatRate;
+        }
+      } else {
+        // No settings configured — use legacy logic
+        shippingCost = subtotal >= 999 ? 0 : 99;
+      }
+    } catch {
+      shippingCost = subtotal >= 999 ? 0 : 99;
+    }
+    const total = Math.round((subtotal + shippingCost) * 100) / 100;
 
     // 4. Decrement stock atomically for each product
     for (const item of verifiedItems) {
@@ -144,7 +161,7 @@ export async function POST(req: NextRequest) {
       items: verifiedItems,
       shippingAddress: orderData.shippingAddress,
       subtotal,
-      shipping,
+      shipping: shippingCost,
       discount: 0,
       total,
       paymentStatus: "paid",
@@ -167,7 +184,7 @@ export async function POST(req: NextRequest) {
         price: item.price,
       })),
       subtotal,
-      shipping,
+      shipping: shippingCost,
       total,
       shippingAddress: orderData.shippingAddress,
       discount: 0,

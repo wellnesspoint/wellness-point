@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import cloudinary from "@/lib/cloudinary";
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,9 +25,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
-    await mkdir(uploadDir, { recursive: true });
-
     const uploadedUrls: string[] = [];
 
     for (const file of files) {
@@ -51,13 +47,26 @@ export async function POST(req: NextRequest) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Generate unique filename
-      const ext = path.extname(file.name) || ".jpg";
-      const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-      const filePath = path.join(uploadDir, uniqueName);
+      // Upload to Cloudinary
+      const result = await new Promise<{ secure_url: string }>(
+        (resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: `wellness-point/${folder}`,
+              resource_type: "image",
+              quality: "auto",
+              fetch_format: "auto",
+            },
+            (error, result) => {
+              if (error || !result) return reject(error);
+              resolve(result);
+            }
+          );
+          stream.end(buffer);
+        }
+      );
 
-      await writeFile(filePath, buffer);
-      uploadedUrls.push(`/uploads/${folder}/${uniqueName}`);
+      uploadedUrls.push(result.secure_url);
     }
 
     return NextResponse.json({

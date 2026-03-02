@@ -72,10 +72,34 @@ export default function CheckoutPage() {
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [processing, setProcessing] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [shippingSettings, setShippingSettings] = useState({
+    flatRate: 99,
+    freeShippingThreshold: 999,
+    enableFreeShipping: true,
+  });
 
   const subtotal = getSubtotal();
-  const shipping = subtotal >= 999 ? 0 : 99;
+  const shipping =
+    shippingSettings.enableFreeShipping && subtotal >= shippingSettings.freeShippingThreshold
+      ? 0
+      : shippingSettings.flatRate;
   const total = subtotal + shipping;
+
+  // Fetch shipping settings from admin config
+  useEffect(() => {
+    fetch("/api/shipping")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.flatRate !== undefined) {
+          setShippingSettings({
+            flatRate: d.flatRate,
+            freeShippingThreshold: d.freeShippingThreshold,
+            enableFreeShipping: d.enableFreeShipping,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -505,9 +529,9 @@ export default function CheckoutPage() {
                       : `₹${shipping}`}
                   </span>
                 </div>
-                {shipping > 0 && (
+                {shipping > 0 && shippingSettings.enableFreeShipping && (
                   <p className="text-xs text-wellness-600">
-                    Free shipping on orders ₹999+
+                    Free shipping on orders ₹{shippingSettings.freeShippingThreshold.toLocaleString("en-IN")}+
                   </p>
                 )}
               </div>

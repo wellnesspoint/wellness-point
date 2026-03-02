@@ -53,17 +53,8 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success("Account created! Signing you in...");
-        const result = await signIn("credentials", {
-          email: form.email,
-          password: form.password,
-          redirect: false,
-        });
-
-        if (result?.ok) {
-          router.push("/dashboard");
-          router.refresh();
-        }
+        toast.success("Account created! Please check your email to verify your account.");
+        router.push("/login?registered=true");
       } else {
         toast.error(data.error || "Failed to create account");
       }

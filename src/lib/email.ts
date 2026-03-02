@@ -203,3 +203,105 @@ export async function sendContactReply(data: ContactReplyData) {
     console.error("Failed to send contact reply email:", error);
   }
 }
+
+// ─── Password Reset Email ──────────────────────────────────────────
+
+interface PasswordResetData {
+  customerName: string;
+  customerEmail: string;
+  resetUrl: string;
+}
+
+export async function sendPasswordResetEmail(data: PasswordResetData) {
+  const transporter = getTransporter();
+  if (!transporter) return;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
+      <div style="text-align:center;padding:20px;background:#065f46;border-radius:8px 8px 0 0">
+        <h1 style="color:#fff;margin:0">Wellness Point</h1>
+      </div>
+      <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
+        <h2 style="color:#065f46">Reset Your Password</h2>
+        <p>Hi <strong>${data.customerName}</strong>,</p>
+        <p>We received a request to reset your password. Click the button below to create a new password:</p>
+        <div style="text-align:center;margin:24px 0">
+          <a href="${data.resetUrl}" style="display:inline-block;background:#065f46;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600">
+            Reset Password
+          </a>
+        </div>
+        <p style="color:#6b7280;font-size:13px">This link expires in <strong>1 hour</strong>. If you didn't request this, you can safely ignore this email.</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
+        <p style="color:#6b7280;font-size:12px">
+          If the button doesn't work, copy and paste this URL into your browser:<br />
+          <a href="${data.resetUrl}" style="color:#065f46;word-break:break-all">${data.resetUrl}</a>
+        </p>
+      </div>
+      <div style="text-align:center;padding:16px;color:#9ca3af;font-size:12px">
+        © ${new Date().getFullYear()} Wellness Point. All rights reserved.
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: FROM_ADDRESS,
+      to: data.customerEmail,
+      subject: "Reset Your Password | Wellness Point",
+      html,
+    });
+  } catch (error) {
+    console.error("Failed to send password reset email:", error);
+  }
+}
+
+// ─── Email Verification ──────────────────────────────────────────
+
+interface EmailVerificationData {
+  customerName: string;
+  customerEmail: string;
+  verifyUrl: string;
+}
+
+export async function sendEmailVerification(data: EmailVerificationData) {
+  const transporter = getTransporter();
+  if (!transporter) return;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
+      <div style="text-align:center;padding:20px;background:#065f46;border-radius:8px 8px 0 0">
+        <h1 style="color:#fff;margin:0">Wellness Point</h1>
+      </div>
+      <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
+        <h2 style="color:#065f46">Verify Your Email</h2>
+        <p>Hi <strong>${data.customerName}</strong>,</p>
+        <p>Welcome to Wellness Point! Please verify your email address by clicking the button below:</p>
+        <div style="text-align:center;margin:24px 0">
+          <a href="${data.verifyUrl}" style="display:inline-block;background:#065f46;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600">
+            Verify Email
+          </a>
+        </div>
+        <p style="color:#6b7280;font-size:13px">This link expires in <strong>24 hours</strong>. If you didn't create an account, you can safely ignore this email.</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
+        <p style="color:#6b7280;font-size:12px">
+          If the button doesn't work, copy and paste this URL:<br />
+          <a href="${data.verifyUrl}" style="color:#065f46;word-break:break-all">${data.verifyUrl}</a>
+        </p>
+      </div>
+      <div style="text-align:center;padding:16px;color:#9ca3af;font-size:12px">
+        © ${new Date().getFullYear()} Wellness Point. All rights reserved.
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: FROM_ADDRESS,
+      to: data.customerEmail,
+      subject: "Verify Your Email | Wellness Point",
+      html,
+    });
+  } catch (error) {
+    console.error("Failed to send email verification:", error);
+  }
+}
