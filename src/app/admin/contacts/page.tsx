@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import toast from "react-hot-toast";
 
 interface Contact {
   _id: string;
@@ -80,7 +81,7 @@ export default function ContactsPage() {
 
   const viewContact = (contact: Contact) => {
     setSelected(contact);
-    setReplyText(contact.adminReply || "");
+    setReplyText("");
     markAsRead(contact);
   };
 
@@ -100,7 +101,8 @@ export default function ContactsPage() {
             c._id === selected._id ? json.contact : c
           )
         );
-        setSelected(json.contact);
+        toast.success("Reply sent!");
+        setSelected(null);
       }
     } catch (err) {
       console.error("Reply error:", err);
@@ -292,23 +294,21 @@ export default function ContactsPage() {
               </div>
             )}
 
-            {/* Reply Form */}
+            {/* Reply Form — only show if not already replied */}
+            {selected.status !== "replied" && (
             <div className="border-t border-slate-700 pt-4">
               <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
                 <Send className="h-4 w-4" />
-                {selected.adminReply ? "Update Reply" : "Write Reply"}
+                Write Reply
               </h3>
               <Textarea
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Type your reply here... (This will be saved. To email the customer, use the email link above.)"
+                placeholder="Type your reply here... This will be emailed to the customer."
                 className="bg-slate-700 border-slate-600 text-white resize-none mb-3"
                 rows={5}
               />
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-500">
-                  💡 To email the customer directly, click their email address above.
-                </p>
+              <div className="flex items-center justify-end">
                 <Button
                   onClick={handleReply}
                   disabled={sending || !replyText.trim()}
@@ -319,10 +319,11 @@ export default function ContactsPage() {
                   ) : (
                     <Send className="h-4 w-4 mr-2" />
                   )}
-                  {sending ? "Saving..." : "Save Reply"}
+                  {sending ? "Sending..." : "Send Reply"}
                 </Button>
               </div>
             </div>
+            )}
           </CardContent>
         </Card>
       </div>

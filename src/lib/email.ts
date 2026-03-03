@@ -28,8 +28,30 @@ function getTransporter() {
   });
 }
 
+function getSalesTransporter() {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT) || 587;
+  const user = process.env.SMTP_SALES_USER;
+  const pass = process.env.SMTP_SALES_PASS;
+
+  if (!host || !user || !pass) {
+    console.warn("Sales SMTP not configured. Falling back to default.");
+    return getTransporter();
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+}
+
 const FROM_ADDRESS =
   process.env.SMTP_FROM || "Wellness Point <support@wellness-point.in>";
+
+const FROM_ADDRESS_SALES =
+  process.env.SMTP_FROM_SALES || "Wellness Point <sales@wellness-point.in>";
 
 // ─── Email templates ──────────────────────────────────────────────
 
@@ -59,7 +81,7 @@ function formatOrderId(id: string): string {
 }
 
 export async function sendOrderConfirmation(data: OrderEmailData) {
-  const transporter = getTransporter();
+  const transporter = getSalesTransporter();
   if (!transporter) return;
 
   const itemRows = data.items
@@ -141,7 +163,7 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
 
   try {
     await transporter.sendMail({
-      from: FROM_ADDRESS,
+      from: FROM_ADDRESS_SALES,
       to: data.customerEmail,
       subject: `Order Confirmed — ${formatOrderId(data.orderId)} | Wellness Point`,
       html,
@@ -175,11 +197,11 @@ export async function sendContactReply(data: ContactReplyData) {
         <p>Thank you for reaching out. Here's our response to your inquiry:</p>
         <div style="background:#fff;border-left:4px solid #065f46;padding:16px;margin:16px 0;border-radius:4px">
           <p style="color:#6b7280;font-size:13px;margin:0 0 8px">Your message about "<em>${data.originalSubject}</em>":</p>
-          <p style="color:#374151;margin:0">${data.originalMessage}</p>
+          <p style="color:#374151;margin:0;white-space:pre-wrap">${data.originalMessage.replace(/\n/g, "<br />")}</p>
         </div>
         <div style="background:#ecfdf5;padding:16px;margin:16px 0;border-radius:8px">
           <p style="color:#065f46;font-weight:600;margin:0 0 8px">Our Reply:</p>
-          <p style="color:#374151;margin:0">${data.adminReply}</p>
+          <p style="color:#374151;margin:0;white-space:pre-wrap">${data.adminReply.replace(/\n/g, "<br />")}</p>
         </div>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
         <p style="color:#6b7280;font-size:13px">

@@ -177,7 +177,14 @@ export default function ContactPage() {
                     type="submit"
                     variant="wellness"
                     size="lg"
-                    disabled={loading}
+                    disabled={
+                      loading ||
+                      !form.name.trim() ||
+                      !form.email.trim() ||
+                      !form.phone.trim() ||
+                      !form.subject.trim() ||
+                      !form.message.trim()
+                    }
                     className="w-full sm:w-auto"
                   >
                     <Send className="mr-2 h-4 w-4" />
