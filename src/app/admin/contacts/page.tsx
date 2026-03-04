@@ -338,7 +338,7 @@ export default function ContactsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <MessageSquare className="h-7 w-7 text-emerald-400" />
-            Contact Queries
+            Contact Us
           </h1>
           <p className="text-sm text-gray-400 mt-1">
             Customer messages from the Contact Us page

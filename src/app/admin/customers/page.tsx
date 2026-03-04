@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,6 +18,7 @@ import {
   Phone,
   Download,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -45,12 +46,18 @@ export default function AdminCustomersPage() {
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const fetchUsers = () => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchUsers = (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((d) => setUsers(d.users || []))
       .catch(() => { })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
   };
 
   useEffect(() => {
@@ -358,6 +365,15 @@ export default function AdminCustomersPage() {
               className="pl-9"
             />
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchUsers(true)}
+            disabled={refreshing}
+            title="Refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
           <Button variant="outline" size="sm" onClick={downloadCSV} title="Download CSV">
             <Download className="h-4 w-4" />
           </Button>

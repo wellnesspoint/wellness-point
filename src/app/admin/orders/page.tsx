@@ -18,6 +18,7 @@ import {
   Eye,
   ArrowLeft,
   FileText,
+  RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
@@ -397,13 +398,18 @@ export default function AdminOrdersPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchOrders = () => {
+  const fetchOrders = (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
     fetch("/api/admin/orders")
       .then((r) => r.json())
       .then((d) => setOrders(d.orders || []))
       .catch(() => { })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
   };
 
   useEffect(() => {
@@ -708,6 +714,15 @@ export default function AdminOrdersPage() {
               className="pl-9"
             />
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchOrders(true)}
+            disabled={refreshing}
+            title="Refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
           <Button variant="outline" size="sm" onClick={downloadCSV} title="Download CSV">
             <Download className="h-4 w-4" />
           </Button>
