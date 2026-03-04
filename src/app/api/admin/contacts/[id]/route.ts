@@ -42,15 +42,21 @@ export async function PUT(req: NextRequest, { params }: Props) {
       );
     }
 
-    // Send reply email if admin replied
+    // Send reply email if admin replied (MUST await — Vercel kills the function after response)
     if (body.adminReply && contact.email) {
-      sendContactReply({
-        customerName: contact.name,
-        customerEmail: contact.email,
-        originalSubject: contact.subject,
-        originalMessage: contact.message,
-        adminReply: body.adminReply,
-      }).catch(() => {}); // Don't fail the update if email fails
+      try {
+        await sendContactReply({
+          customerName: contact.name,
+          customerEmail: contact.email,
+          originalSubject: contact.subject,
+          originalMessage: contact.message,
+          adminReply: body.adminReply,
+        });
+        console.log("Contact reply email sent to:", contact.email);
+      } catch (emailErr) {
+        console.error("Contact reply email failed:", emailErr);
+        // Don't fail the update — email is best-effort
+      }
     }
 
     return NextResponse.json({ contact });

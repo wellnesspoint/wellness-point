@@ -171,27 +171,31 @@ export async function POST(req: NextRequest) {
       razorpaySignature: razorpay_signature,
     });
 
-    // 6. Send order confirmation email (non-blocking)
+    // 6. Send order confirmation email (MUST await — Vercel kills the function after response)
     // Use the email from the checkout form (shippingAddress.email), not the account email
     const recipientEmail = orderData.shippingAddress?.email || session.user?.email || "";
-    sendOrderConfirmation({
-      customerName: orderData.shippingAddress?.fullName || session.user?.name || "Customer",
-      customerEmail: recipientEmail,
-      orderId: order._id.toString(),
-      items: verifiedItems.map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      subtotal,
-      shipping: shippingCost,
-      total,
-      shippingAddress: orderData.shippingAddress,
-      discount: 0,
-      createdAt: order.createdAt,
-    }).catch((err) => {
-      console.error("Order confirmation email failed:", err);
-    });
+    try {
+      await sendOrderConfirmation({
+        customerName: orderData.shippingAddress?.fullName || session.user?.name || "Customer",
+        customerEmail: recipientEmail,
+        orderId: order._id.toString(),
+        items: verifiedItems.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        subtotal,
+        shipping: shippingCost,
+        total,
+        shippingAddress: orderData.shippingAddress,
+        discount: 0,
+        createdAt: order.createdAt,
+      });
+      console.log("Order confirmation email sent to:", recipientEmail);
+    } catch (emailErr) {
+      console.error("Order confirmation email failed:", emailErr);
+      // Don't fail the order — email is best-effort
+    }
 
     return NextResponse.json({
       success: true,

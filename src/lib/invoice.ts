@@ -31,12 +31,25 @@ function fmt(n: number): string {
 }
 
 // Load logo from public/ as base64 data URI (server-side)
+// On Vercel serverless, public/ may not be on the filesystem,
+// so we also try the .next/server path and gracefully skip if not found.
 function loadLogoBase64(): string | null {
   try {
-    const logoPath = path.join(process.cwd(), "public", "logo.png");
-    const buffer = fs.readFileSync(logoPath);
-    return "data:image/png;base64," + buffer.toString("base64");
-  } catch {
+    // Try standard path first (works locally and in some hosting)
+    const candidates = [
+      path.join(process.cwd(), "public", "logo.png"),
+      path.join(process.cwd(), ".next", "static", "media", "logo.png"),
+    ];
+    for (const logoPath of candidates) {
+      if (fs.existsSync(logoPath)) {
+        const buffer = fs.readFileSync(logoPath);
+        return "data:image/png;base64," + buffer.toString("base64");
+      }
+    }
+    console.warn("Invoice logo not found at any expected path — PDF will omit logo.");
+    return null;
+  } catch (err) {
+    console.warn("Failed to load logo for invoice:", err);
     return null;
   }
 }

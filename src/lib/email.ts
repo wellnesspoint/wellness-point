@@ -89,7 +89,10 @@ function formatOrderId(id: string): string {
 
 export async function sendOrderConfirmation(data: OrderEmailData) {
   const transporter = getSalesTransporter();
-  if (!transporter) return;
+  if (!transporter) {
+    console.error("sendOrderConfirmation: No SMTP transporter available. Check SMTP_HOST, SMTP_ORDERS_USER, SMTP_ORDERS_PASS env vars.");
+    throw new Error("SMTP not configured — cannot send order confirmation email");
+  }
 
   const itemRows = data.items
     .map(
@@ -164,21 +167,21 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
         contentType: "application/pdf",
       },
     ];
+    console.log("Invoice PDF generated successfully for order:", orderId8);
   } catch (err) {
     console.error("Failed to generate invoice PDF for email:", err);
+    // Continue sending email without PDF attachment
   }
 
-  try {
-    await transporter.sendMail({
-      from: FROM_ADDRESS_SALES,
-      to: data.customerEmail,
-      subject: `Order Confirmed — ${formatOrderId(data.orderId)} | Wellness Point`,
-      html,
-      attachments,
-    });
-  } catch (error) {
-    console.error("Failed to send order confirmation email:", error);
-  }
+  // Send the email — let errors propagate to caller
+  await transporter.sendMail({
+    from: FROM_ADDRESS_SALES,
+    to: data.customerEmail,
+    subject: `Order Confirmed — ${formatOrderId(data.orderId)} | Wellness Point`,
+    html,
+    attachments,
+  });
+  console.log("Order confirmation email sent to:", data.customerEmail);
 }
 
 interface ContactReplyData {
@@ -191,7 +194,10 @@ interface ContactReplyData {
 
 export async function sendContactReply(data: ContactReplyData) {
   const transporter = getTransporter();
-  if (!transporter) return;
+  if (!transporter) {
+    console.error("sendContactReply: No SMTP transporter available. Check SMTP_HOST, SMTP_SUPPORT_USER, SMTP_SUPPORT_PASS env vars.");
+    throw new Error("SMTP not configured — cannot send contact reply email");
+  }
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
@@ -221,16 +227,14 @@ export async function sendContactReply(data: ContactReplyData) {
     </div>
   `;
 
-  try {
-    await transporter.sendMail({
-      from: FROM_ADDRESS,
-      to: data.customerEmail,
-      subject: `Re: ${data.originalSubject} | Wellness Point`,
-      html,
-    });
-  } catch (error) {
-    console.error("Failed to send contact reply email:", error);
-  }
+  // Send the email — let errors propagate to caller
+  await transporter.sendMail({
+    from: FROM_ADDRESS,
+    to: data.customerEmail,
+    subject: `Re: ${data.originalSubject} | Wellness Point`,
+    html,
+  });
+  console.log("Contact reply email sent to:", data.customerEmail);
 }
 
 // ─── Password Reset Email ──────────────────────────────────────────
@@ -292,7 +296,10 @@ interface EmailVerificationData {
 
 export async function sendEmailVerification(data: EmailVerificationData) {
   const transporter = getTransporter();
-  if (!transporter) return;
+  if (!transporter) {
+    console.error("sendEmailVerification: No SMTP transporter available.");
+    throw new Error("SMTP not configured — cannot send verification email");
+  }
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
@@ -321,14 +328,11 @@ export async function sendEmailVerification(data: EmailVerificationData) {
     </div>
   `;
 
-  try {
-    await transporter.sendMail({
-      from: FROM_ADDRESS,
-      to: data.customerEmail,
-      subject: "Verify Your Email | Wellness Point",
-      html,
-    });
-  } catch (error) {
-    console.error("Failed to send email verification:", error);
-  }
+  await transporter.sendMail({
+    from: FROM_ADDRESS,
+    to: data.customerEmail,
+    subject: "Verify Your Email | Wellness Point",
+    html,
+  });
+  console.log("Verification email sent to:", data.customerEmail);
 }
