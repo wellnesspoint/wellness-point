@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, Plus, Pencil, Trash2, Star, X } from "lucide-react";
+import { MapPin, Plus, Pencil, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface Address {
@@ -27,14 +27,14 @@ const emptyAddress: Address = {
   city: "",
   state: "",
   pincode: "",
-  isDefault: false,
+  isDefault: true, // Always default since only 1 address
 };
 
 export default function AddressesPage() {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Address>(emptyAddress);
   const [saving, setSaving] = useState(false);
 
@@ -64,7 +64,7 @@ export default function AddressesPage() {
       });
       if (!res.ok) throw new Error();
       setAddresses(updated);
-      toast.success("Addresses updated");
+      toast.success("Address updated");
     } catch {
       toast.error("Failed to save");
     } finally {
@@ -74,27 +74,22 @@ export default function AddressesPage() {
 
   const handleAdd = () => {
     setForm(emptyAddress);
-    setEditIdx(null);
+    setEditing(false);
     setShowForm(true);
   };
 
-  const handleEdit = (idx: number) => {
-    setForm({ ...addresses[idx] });
-    setEditIdx(idx);
-    setShowForm(true);
+  const handleEdit = () => {
+    if (addresses[0]) {
+      setForm({ ...addresses[0] });
+      setEditing(true);
+      setShowForm(true);
+    }
   };
 
-  const handleDelete = (idx: number) => {
-    const updated = addresses.filter((_, i) => i !== idx);
-    saveAddresses(updated);
-  };
-
-  const handleSetDefault = (idx: number) => {
-    const updated = addresses.map((a, i) => ({
-      ...a,
-      isDefault: i === idx,
-    }));
-    saveAddresses(updated);
+  const handleDelete = () => {
+    saveAddresses([]);
+    setShowForm(false);
+    setEditing(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -103,31 +98,30 @@ export default function AddressesPage() {
       toast.error("Please fill all fields");
       return;
     }
-
-    let updated: Address[];
-    if (editIdx !== null) {
-      updated = addresses.map((a, i) => (i === editIdx ? form : a));
-    } else {
-      // If first address, make it default
-      const newAddr = {
-        ...form,
-        isDefault: addresses.length === 0 ? true : form.isDefault,
-      };
-      updated = [...addresses, newAddr];
+    if (form.phone.length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
     }
-    saveAddresses(updated);
+    if (!/^\d{6}$/.test(form.pincode)) {
+      toast.error("Pincode must be exactly 6 digits");
+      return;
+    }
+
+    // Always save as default (only 1 address)
+    const addr: Address = { ...form, isDefault: true };
+    saveAddresses([addr]);
     setShowForm(false);
+    setEditing(false);
     setForm(emptyAddress);
-    setEditIdx(null);
   };
+
+  const hasAddress = addresses.length > 0;
 
   if (loading) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-foreground">My Addresses</h1>
-        {[1, 2].map((i) => (
-          <Skeleton key={i} className="h-32 w-full rounded-xl" />
-        ))}
+        <h1 className="text-2xl font-bold text-foreground">My Address</h1>
+        <Skeleton className="h-32 w-full rounded-xl" />
       </div>
     );
   }
@@ -135,8 +129,8 @@ export default function AddressesPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">My Addresses</h1>
-        {!showForm && (
+        <h1 className="text-2xl font-bold text-foreground">My Address</h1>
+        {!showForm && !hasAddress && (
           <Button size="sm" variant="wellness" onClick={handleAdd}>
             <Plus className="mr-1 h-4 w-4" /> Add Address
           </Button>
@@ -148,12 +142,12 @@ export default function AddressesPage() {
         <Card className="border-0 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">
-              {editIdx !== null ? "Edit Address" : "New Address"}
+              {editing ? "Edit Address" : "New Address"}
             </CardTitle>
             <button
               onClick={() => {
                 setShowForm(false);
-                setEditIdx(null);
+                setEditing(false);
               }}
             >
               <X className="h-5 w-5 text-muted-foreground" />
@@ -215,25 +209,14 @@ export default function AddressesPage() {
                 <Label>Pincode</Label>
                 <Input
                   value={form.pincode}
-                  onChange={(e) =>
-                    setForm({ ...form, pincode: e.target.value })
-                  }
-                  placeholder="400001"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    setForm({ ...form, pincode: val });
+                  }}
+                  placeholder="560001"
+                  maxLength={6}
+                  inputMode="numeric"
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isDefault"
-                  checked={form.isDefault}
-                  onChange={(e) =>
-                    setForm({ ...form, isDefault: e.target.checked })
-                  }
-                  className="h-4 w-4 rounded border-gray-300 text-wellness-600"
-                />
-                <Label htmlFor="isDefault" className="mb-0 cursor-pointer">
-                  Set as default
-                </Label>
               </div>
               <div className="sm:col-span-2">
                 <Button
@@ -242,7 +225,7 @@ export default function AddressesPage() {
                   disabled={saving}
                   className="w-full sm:w-auto"
                 >
-                  {saving ? "Saving..." : editIdx !== null ? "Update Address" : "Save Address"}
+                  {saving ? "Saving..." : editing ? "Update Address" : "Save Address"}
                 </Button>
               </div>
             </form>
@@ -250,65 +233,44 @@ export default function AddressesPage() {
         </Card>
       )}
 
-      {/* Address Cards */}
-      {addresses.length === 0 && !showForm ? (
+      {/* Address Card (max 1) */}
+      {!hasAddress && !showForm ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="py-16 text-center">
             <MapPin className="mx-auto mb-3 h-14 w-14 text-muted" />
-            <p className="text-muted-foreground">No addresses saved</p>
+            <p className="text-muted-foreground">No address saved yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Add your address here or it will be saved automatically when you place your first order.
+            </p>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {addresses.map((addr, idx) => (
-            <Card
-              key={idx}
-              className={`relative border shadow-sm ${
-                addr.isDefault
-                  ? "border-wellness-300 bg-wellness-50/30"
-                  : "border-gray-100"
-              }`}
-            >
-              <CardContent className="p-5">
-                {addr.isDefault && (
-                  <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-wellness-100 px-2 py-0.5 text-xs font-medium text-wellness-700">
-                    <Star className="h-3 w-3" /> Default
-                  </span>
-                )}
-                <p className="text-sm font-semibold text-foreground">
-                  {addr.fullName}
-                </p>
-                <p className="mt-0.5 text-sm text-muted-foreground">{addr.phone}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {addr.street}, {addr.city}, {addr.state} – {addr.pincode}
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => handleEdit(idx)}
-                    className="flex items-center gap-1 text-xs text-wellness-600 hover:text-wellness-700"
-                  >
-                    <Pencil className="h-3 w-3" /> Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(idx)}
-                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 className="h-3 w-3" /> Delete
-                  </button>
-                  {!addr.isDefault && (
-                    <button
-                      onClick={() => handleSetDefault(idx)}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      <Star className="h-3 w-3" /> Set Default
-                    </button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      ) : hasAddress && !showForm ? (
+        <Card className="border shadow-sm border-wellness-300 bg-wellness-50/30">
+          <CardContent className="p-5">
+            <p className="text-sm font-semibold text-foreground">
+              {addresses[0].fullName}
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{addresses[0].phone}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {addresses[0].street}, {addresses[0].city}, {addresses[0].state} – {addresses[0].pincode}
+            </p>
+            <div className="mt-3 flex gap-3">
+              <button
+                onClick={handleEdit}
+                className="flex items-center gap-1 text-xs text-wellness-600 hover:text-wellness-700"
+              >
+                <Pencil className="h-3 w-3" /> Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600"
+              >
+                <Trash2 className="h-3 w-3" /> Delete
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

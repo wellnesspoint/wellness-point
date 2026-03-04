@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cart";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag, CreditCard, MapPin, ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
+import { ShoppingBag, CreditCard, MapPin, ArrowLeft, Minus, Plus, Trash2, Save } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -30,6 +30,30 @@ interface Address {
   pincode: string;
 }
 
+const emptyAddress: Address = {
+  fullName: "",
+  email: "",
+  phone: "",
+  street: "",
+  addressLine2: "",
+  city: "",
+  state: "",
+  pincode: "",
+};
+
+/** Check if the user changed the address from the original saved one */
+function isAddressModified(current: Address, original: Address | null): boolean {
+  if (!original) return true; // No saved address → treat as "new"
+  return (
+    current.fullName !== original.fullName ||
+    current.phone !== original.phone ||
+    current.street !== original.street ||
+    current.city !== original.city ||
+    current.state !== original.state ||
+    current.pincode !== original.pincode
+  );
+}
+
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -45,19 +69,17 @@ export default function CheckoutPage() {
         if (saved) return JSON.parse(saved);
       } catch {}
     }
-    return {
-      fullName: "",
-      email: "",
-      phone: "",
-      street: "",
-      addressLine2: "",
-      city: "",
-      state: "",
-      pincode: "",
-    };
+    return { ...emptyAddress };
   };
 
   const [address, setAddress] = useState<Address>(getInitialAddress);
+
+  // The address fetched from the user's profile (null = no saved address)
+  const profileAddressRef = useRef<Address | null>(null);
+  const [hasSavedAddress, setHasSavedAddress] = useState(false);
+
+  // Whether user wants to save their (new/edited) address to profile
+  const [saveToProfile, setSaveToProfile] = useState(true);
 
   // Persist address to sessionStorage whenever it changes
   const updateAddress = useCallback((updater: Address | ((prev: Address) => Address)) => {
@@ -69,7 +91,7 @@ export default function CheckoutPage() {
       return next;
     });
   }, []);
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+
   const [processing, setProcessing] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [shippingSettings, setShippingSettings] = useState({
@@ -122,7 +144,7 @@ export default function CheckoutPage() {
     document.body.appendChild(script);
   }, []);
 
-  // Load saved addresses & profile data (only if no cached form data)
+  // Load saved address & profile data (only if no cached form data)
   useEffect(() => {
     if (session) {
       fetch("/api/user/profile")
@@ -130,32 +152,41 @@ export default function CheckoutPage() {
         .then((d) => {
           const user = d.user || {};
           const addrs = user.addresses || [];
-          setSavedAddresses(addrs);
+          const savedAddr = addrs[0]; // Only 1 address allowed
 
-          // Only prefill from profile/saved address if user hasn't already typed something
-          const hasCachedData = sessionStorage.getItem(STORAGE_KEY);
-          if (hasCachedData) return;
-
-          const defaultAddr = addrs.find((a: any) => a.isDefault) || addrs[0];
-          if (defaultAddr) {
-            updateAddress({
-              fullName: defaultAddr.fullName || user.name || "",
-              email: defaultAddr.email || user.email || session?.user?.email || "",
-              phone: defaultAddr.phone || user.phone || "",
-              street: defaultAddr.street || "",
-              addressLine2: defaultAddr.addressLine2 || "",
-              city: defaultAddr.city || "",
-              state: defaultAddr.state || "",
-              pincode: defaultAddr.pincode || "",
-            });
-          } else {
-            // No saved address — prefill from profile
-            updateAddress((prev) => ({
-              ...prev,
-              fullName: user.name || "",
+          if (savedAddr) {
+            setHasSavedAddress(true);
+            const mapped: Address = {
+              fullName: savedAddr.fullName || user.name || "",
               email: user.email || session?.user?.email || "",
-              phone: user.phone || "",
-            }));
+              phone: savedAddr.phone || user.phone || "",
+              street: savedAddr.street || "",
+              addressLine2: savedAddr.addressLine2 || "",
+              city: savedAddr.city || "",
+              state: savedAddr.state || "",
+              pincode: savedAddr.pincode || "",
+            };
+            profileAddressRef.current = mapped;
+
+            // Only prefill from saved address if user hasn't already typed something
+            const hasCachedData = sessionStorage.getItem(STORAGE_KEY);
+            if (!hasCachedData) {
+              updateAddress(mapped);
+            }
+          } else {
+            setHasSavedAddress(false);
+            profileAddressRef.current = null;
+
+            // No saved address — prefill name/email/phone from profile
+            const hasCachedData = sessionStorage.getItem(STORAGE_KEY);
+            if (!hasCachedData) {
+              updateAddress((prev) => ({
+                ...prev,
+                fullName: user.name || "",
+                email: user.email || session?.user?.email || "",
+                phone: user.phone || "",
+              }));
+            }
           }
         })
         .catch(() => {});
@@ -188,6 +219,32 @@ export default function CheckoutPage() {
       return false;
     }
     return true;
+  };
+
+  /** Save the current checkout address to user's profile */
+  const saveAddressToProfile = async () => {
+    try {
+      await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          addresses: [
+            {
+              fullName: address.fullName,
+              phone: address.phone,
+              street: address.street,
+              city: address.city,
+              state: address.state,
+              pincode: address.pincode,
+              isDefault: true,
+            },
+          ],
+        }),
+      });
+    } catch {
+      // Non-critical — don't break the order flow
+      console.error("Failed to save address to profile");
+    }
   };
 
   const handlePayment = async () => {
@@ -252,6 +309,14 @@ export default function CheckoutPage() {
             const verifyData = await verifyRes.json();
 
             if (verifyData.success) {
+              // Save address to profile:
+              // - First-time order (no saved address) → always save
+              // - Returning order with edited address → save only if user opted in
+              const addressChanged = isAddressModified(address, profileAddressRef.current);
+              if (!hasSavedAddress || (addressChanged && saveToProfile)) {
+                await saveAddressToProfile();
+              }
+
               clearCart();
               try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
               toast.success("Order placed successfully!");
@@ -323,40 +388,14 @@ export default function CheckoutPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left – Address */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Saved addresses */}
-          {savedAddresses.length > 1 && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Saved Addresses
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {savedAddresses.map((a, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() =>
-                      updateAddress({
-                        fullName: a.fullName,
-                        email: a.email || session?.user?.email || "",
-                        phone: a.phone,
-                        street: a.street,
-                        addressLine2: (a as any).addressLine2 || "",
-                        city: a.city,
-                        state: a.state,
-                        pincode: a.pincode,
-                      })
-                    }
-                    className="rounded-lg border px-3 py-2 text-left text-xs hover:border-wellness-300 hover:bg-wellness-50"
-                  >
-                    <p className="font-medium">{a.fullName}</p>
-                    <p className="text-muted-foreground">
-                      {a.city}, {a.state}
-                    </p>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
+          {/* Saved address indicator */}
+          {hasSavedAddress && profileAddressRef.current && (
+            <div className="flex items-center gap-2 rounded-lg border border-wellness-200 bg-wellness-50/50 px-4 py-2.5 text-sm">
+              <MapPin className="h-4 w-4 text-wellness-600 shrink-0" />
+              <span className="text-muted-foreground">
+                Shipping to <span className="font-medium text-foreground">{profileAddressRef.current.fullName}</span> — {profileAddressRef.current.city}, {profileAddressRef.current.state}
+              </span>
+            </div>
           )}
 
           {/* Address Form */}
@@ -453,6 +492,23 @@ export default function CheckoutPage() {
                     inputMode="numeric"
                   />
                 </div>
+
+                {/* Save address checkbox — shown when user edits an existing saved address */}
+                {hasSavedAddress && isAddressModified(address, profileAddressRef.current) && (
+                  <div className="sm:col-span-2 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      id="saveToProfile"
+                      checked={saveToProfile}
+                      onChange={(e) => setSaveToProfile(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-wellness-600"
+                    />
+                    <Label htmlFor="saveToProfile" className="mb-0 cursor-pointer text-sm text-muted-foreground">
+                      <Save className="mr-1 inline h-3.5 w-3.5" />
+                      Update my saved address with this new one
+                    </Label>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
