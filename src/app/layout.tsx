@@ -4,6 +4,7 @@ import "./globals.css";
 import { SITE_CONFIG } from "@/lib/constants";
 import Providers from "./providers";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Script from "next/script";
 
 const inter = Inter({
@@ -70,6 +71,7 @@ export default function RootLayout({
       <body className="min-h-screen font-sans">
         <Providers>{children}</Providers>
         <Analytics />
+        <SpeedInsights />
         {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
           <>
             <Script
