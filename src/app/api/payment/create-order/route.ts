@@ -103,9 +103,9 @@ export async function POST(req: NextRequest) {
     // Shipping — use admin settings
     let shipping = 50; // fallback
     try {
-      const shippingConfig = await ShippingSettings.findOne().lean();
+      const shippingConfig = await ShippingSettings.findOne().lean() as { enableFreeShipping?: boolean; freeShippingThreshold?: number; flatRate?: number } | null;
       if (shippingConfig) {
-        if (shippingConfig.enableFreeShipping && subtotal >= shippingConfig.freeShippingThreshold) {
+        if (shippingConfig.enableFreeShipping && subtotal >= (shippingConfig.freeShippingThreshold ?? 999)) {
           shipping = 0;
         } else {
           shipping = shippingConfig.flatRate;
