@@ -22,6 +22,7 @@ async function seed() {
         role: "admin",
         provider: "credentials",
         isActive: true,
+        emailVerified: true,
         addresses: [],
         createdAt: new Date(),
         updatedAt: new Date(),
