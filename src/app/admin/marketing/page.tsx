@@ -193,9 +193,9 @@ export default function MarketingPage() {
   };
 
   const positionColors: Record<string, string> = {
-    hero: "bg-blue-500/20 text-blue-400",
-    promo: "bg-purple-500/20 text-purple-400",
-    sidebar: "bg-orange-500/20 text-orange-400",
+    hero: "bg-blue-100 text-blue-700",
+    promo: "bg-purple-100 text-purple-700",
+    sidebar: "bg-orange-100 text-orange-700",
   };
 
   if (loading) {
@@ -216,11 +216,11 @@ export default function MarketingPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Megaphone className="h-7 w-7 text-emerald-400" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Megaphone className="h-7 w-7 text-emerald-500" />
             Marketing & Banners
           </h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Manage promotional banners and homepage sliders
           </p>
         </div>
@@ -238,43 +238,43 @@ export default function MarketingPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="border-0 shadow-sm">
           <CardContent className="pt-4 pb-4 px-4 text-center">
-            <p className="text-2xl font-bold text-white">{banners.length}</p>
-            <p className="text-xs text-gray-400">Total Banners</p>
+            <p className="text-2xl font-bold text-foreground">{banners.length}</p>
+            <p className="text-xs text-muted-foreground">Total Banners</p>
           </CardContent>
         </Card>
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="border-0 shadow-sm">
           <CardContent className="pt-4 pb-4 px-4 text-center">
-            <p className="text-2xl font-bold text-emerald-400">
+            <p className="text-2xl font-bold text-emerald-600">
               {banners.filter((b) => b.isActive).length}
             </p>
-            <p className="text-xs text-gray-400">Active</p>
+            <p className="text-xs text-muted-foreground">Active</p>
           </CardContent>
         </Card>
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="border-0 shadow-sm">
           <CardContent className="pt-4 pb-4 px-4 text-center">
-            <p className="text-2xl font-bold text-blue-400">
+            <p className="text-2xl font-bold text-blue-600">
               {banners.filter((b) => b.position === "hero").length}
             </p>
-            <p className="text-xs text-gray-400">Hero Sliders</p>
+            <p className="text-xs text-muted-foreground">Hero Sliders</p>
           </CardContent>
         </Card>
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="border-0 shadow-sm">
           <CardContent className="pt-4 pb-4 px-4 text-center">
-            <p className="text-2xl font-bold text-purple-400">
+            <p className="text-2xl font-bold text-purple-600">
               {banners.filter((b) => b.position === "promo").length}
             </p>
-            <p className="text-xs text-gray-400">Promotions</p>
+            <p className="text-xs text-muted-foreground">Promotions</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Create/Edit Form */}
       {showForm && (
-        <Card className="bg-slate-800/50 border-emerald-600/50">
+        <Card className="border-0 shadow-sm ring-2 ring-emerald-200">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-white">
+            <CardTitle className="text-foreground">
               {editing ? "Edit Banner" : "New Banner"}
             </CardTitle>
             <Button
@@ -284,7 +284,7 @@ export default function MarketingPage() {
                 setShowForm(false);
                 setEditing(null);
               }}
-              className="text-gray-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -292,55 +292,53 @@ export default function MarketingPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-gray-300">Title *</Label>
+                <Label className="text-foreground">Title *</Label>
                 <Input
                   value={form.title}
                   onChange={(e) =>
                     setForm({ ...form, title: e.target.value })
                   }
                   placeholder="Banner title"
-                  className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">Subtitle</Label>
+                <Label className="text-foreground">Subtitle</Label>
                 <Input
                   value={form.subtitle}
                   onChange={(e) =>
                     setForm({ ...form, subtitle: e.target.value })
                   }
                   placeholder="Optional subtitle text"
-                  className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-gray-300">Image URL *</Label>
+                <Label className="text-foreground">Image URL *</Label>
                 <div className="relative">
-                  <Image className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Image className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={form.imageUrl}
                     onChange={(e) =>
                       setForm({ ...form, imageUrl: e.target.value })
                     }
                     placeholder="https://..."
-                    className="bg-slate-700 border-slate-600 text-white pl-10"
+                    className="pl-10"
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">Link URL</Label>
+                <Label className="text-foreground">Link URL</Label>
                 <div className="relative">
-                  <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={form.linkUrl}
                     onChange={(e) =>
                       setForm({ ...form, linkUrl: e.target.value })
                     }
                     placeholder="/products or https://..."
-                    className="bg-slate-700 border-slate-600 text-white pl-10"
+                    className="pl-10"
                   />
                 </div>
               </div>
@@ -348,17 +346,17 @@ export default function MarketingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label className="text-gray-300">Position</Label>
+                <Label className="text-foreground">Position</Label>
                 <Select
                   value={form.position}
                   onValueChange={(v: any) =>
                     setForm({ ...form, position: v })
                   }
                 >
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
+                  <SelectContent>
                     <SelectItem value="hero">Hero Slider</SelectItem>
                     <SelectItem value="promo">Promotional</SelectItem>
                     <SelectItem value="sidebar">Sidebar</SelectItem>
@@ -366,7 +364,7 @@ export default function MarketingPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">Sort Order</Label>
+                <Label className="text-foreground">Sort Order</Label>
                 <Input
                   type="number"
                   value={form.sortOrder}
@@ -376,7 +374,6 @@ export default function MarketingPage() {
                       sortOrder: parseInt(e.target.value) || 0,
                     })
                   }
-                  className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
               <div className="flex items-end gap-3 pb-1">
@@ -387,11 +384,11 @@ export default function MarketingPage() {
                   onChange={(e) =>
                     setForm({ ...form, isActive: e.target.checked })
                   }
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500"
+                  className="h-4 w-4 rounded border-border text-emerald-600 focus:ring-emerald-500"
                 />
                 <Label
                   htmlFor="bannerActive"
-                  className="text-gray-300 cursor-pointer"
+                  className="text-foreground cursor-pointer"
                 >
                   Active
                 </Label>
@@ -400,7 +397,7 @@ export default function MarketingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-gray-300">
+                <Label className="text-foreground">
                   Start Date (optional)
                 </Label>
                 <Input
@@ -409,11 +406,10 @@ export default function MarketingPage() {
                   onChange={(e) =>
                     setForm({ ...form, startDate: e.target.value })
                   }
-                  className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-gray-300">
+                <Label className="text-foreground">
                   End Date (optional)
                 </Label>
                 <Input
@@ -422,14 +418,13 @@ export default function MarketingPage() {
                   onChange={(e) =>
                     setForm({ ...form, endDate: e.target.value })
                   }
-                  className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
             </div>
 
             {/* Image Preview */}
             {form.imageUrl && (
-              <div className="rounded-lg overflow-hidden border border-slate-600 max-h-48">
+              <div className="rounded-lg overflow-hidden border border-border max-h-48">
                 <img
                   src={form.imageUrl}
                   alt="Preview"
@@ -448,7 +443,6 @@ export default function MarketingPage() {
                   setShowForm(false);
                   setEditing(null);
                 }}
-                className="border-slate-600 text-gray-300"
               >
                 Cancel
               </Button>
@@ -478,7 +472,7 @@ export default function MarketingPage() {
             className={
               filter === f
                 ? "bg-emerald-600 text-white"
-                : "border-slate-600 text-gray-400 hover:text-white"
+                : ""
             }
           >
             {f === "all"
@@ -490,7 +484,7 @@ export default function MarketingPage() {
 
       {/* Banner List */}
       {filteredBanners.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-muted-foreground">
           <Megaphone className="h-12 w-12 mx-auto mb-3 opacity-50" />
           <p>No banners found</p>
           <p className="text-sm mt-1">Create your first banner to get started</p>
@@ -500,12 +494,12 @@ export default function MarketingPage() {
           {filteredBanners.map((banner) => (
             <Card
               key={banner._id}
-              className={`bg-slate-800/50 border-slate-700 overflow-hidden ${
+              className={`border-0 shadow-sm overflow-hidden ${
                 !banner.isActive ? "opacity-60" : ""
               }`}
             >
               {/* Image */}
-              <div className="relative h-40 bg-slate-700">
+              <div className="relative h-40 bg-muted">
                 <img
                   src={banner.imageUrl}
                   alt={banner.title}
@@ -513,7 +507,7 @@ export default function MarketingPage() {
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = "";
                     (e.target as HTMLImageElement).className =
-                      "w-full h-full bg-slate-700";
+                      "w-full h-full bg-muted";
                   }}
                 />
                 <div className="absolute top-2 left-2 flex gap-2">
@@ -523,33 +517,33 @@ export default function MarketingPage() {
                     {positionLabels[banner.position]}
                   </span>
                   {!banner.isActive && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
                       Inactive
                     </span>
                   )}
                 </div>
-                <span className="absolute top-2 right-2 text-xs bg-slate-900/70 text-gray-300 px-2 py-0.5 rounded">
+                <span className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
                   #{banner.sortOrder}
                 </span>
               </div>
 
               <CardContent className="pt-3 pb-3 px-4">
-                <h3 className="text-white font-medium truncate">
+                <h3 className="text-foreground font-medium truncate">
                   {banner.title}
                 </h3>
                 {banner.subtitle && (
-                  <p className="text-xs text-gray-400 truncate mt-0.5">
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
                     {banner.subtitle}
                   </p>
                 )}
                 {banner.linkUrl && (
-                  <p className="text-xs text-emerald-400 truncate mt-1 flex items-center gap-1">
+                  <p className="text-xs text-emerald-600 truncate mt-1 flex items-center gap-1">
                     <Link className="h-3 w-3" />
                     {banner.linkUrl}
                   </p>
                 )}
                 {(banner.startDate || banner.endDate) && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {banner.startDate
                       ? new Date(banner.startDate).toLocaleDateString()
                       : "∞"}{" "}
@@ -560,8 +554,8 @@ export default function MarketingPage() {
                   </p>
                 )}
 
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
-                  <span className="text-xs text-gray-500">
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                  <span className="text-xs text-muted-foreground">
                     {new Date(banner.createdAt).toLocaleDateString()}
                   </span>
                   <div className="flex items-center gap-1">
@@ -574,7 +568,7 @@ export default function MarketingPage() {
                           banner.sortOrder - 1
                         )
                       }
-                      className="h-7 w-7 p-0 text-gray-400 hover:text-white"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                     >
                       <ArrowUp className="h-3 w-3" />
                     </Button>
@@ -587,7 +581,7 @@ export default function MarketingPage() {
                           banner.sortOrder + 1
                         )
                       }
-                      className="h-7 w-7 p-0 text-gray-400 hover:text-white"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                     >
                       <ArrowDown className="h-3 w-3" />
                     </Button>
@@ -595,7 +589,7 @@ export default function MarketingPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleActive(banner)}
-                      className="h-7 w-7 p-0 text-gray-400 hover:text-white"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                     >
                       {banner.isActive ? (
                         <Eye className="h-3 w-3" />
@@ -607,7 +601,7 @@ export default function MarketingPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => editBanner(banner)}
-                      className="h-7 w-7 p-0 text-gray-400 hover:text-blue-400"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-blue-500"
                     >
                       <Pencil className="h-3 w-3" />
                     </Button>
@@ -615,7 +609,7 @@ export default function MarketingPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(banner._id)}
-                      className="h-7 w-7 p-0 text-gray-400 hover:text-red-400"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>

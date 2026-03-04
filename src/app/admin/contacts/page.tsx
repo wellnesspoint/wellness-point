@@ -158,10 +158,10 @@ export default function ContactsPage() {
   };
 
   const statusColors: Record<string, string> = {
-    new: "bg-red-500/20 text-red-400",
-    read: "bg-blue-500/20 text-blue-400",
-    replied: "bg-emerald-500/20 text-emerald-400",
-    archived: "bg-gray-500/20 text-gray-400",
+    new: "bg-red-100 text-red-700",
+    read: "bg-blue-100 text-blue-700",
+    replied: "bg-emerald-100 text-emerald-700",
+    archived: "bg-gray-100 text-gray-600",
   };
 
   const statusIcons: Record<string, React.ReactNode> = {
@@ -194,16 +194,16 @@ export default function ContactsPage() {
         <Button
           variant="ghost"
           onClick={() => setSelected(null)}
-          className="text-gray-400 hover:text-white"
+          className="text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to Queries
         </Button>
 
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-white text-xl">
+                <CardTitle className="text-foreground text-xl">
                   {selected.subject}
                 </CardTitle>
                 <div className="flex items-center gap-3 mt-2">
@@ -213,7 +213,7 @@ export default function ContactsPage() {
                     {statusIcons[selected.status]}
                     {selected.status}
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     {new Date(selected.createdAt).toLocaleString()}
                   </span>
                 </div>
@@ -223,7 +223,6 @@ export default function ContactsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleArchive(selected._id)}
-                  className="border-slate-600 text-gray-400 hover:text-white"
                 >
                   <Archive className="h-4 w-4 mr-1" /> Archive
                 </Button>
@@ -231,7 +230,7 @@ export default function ContactsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleDelete(selected._id)}
-                  className="border-red-600/50 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  className="border-red-200 text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
                   <Trash2 className="h-4 w-4 mr-1" /> Delete
                 </Button>
@@ -240,26 +239,26 @@ export default function ContactsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Sender Info */}
-            <div className="bg-slate-700/50 rounded-lg p-4 space-y-2">
+            <div className="bg-muted rounded-lg p-4 space-y-2">
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400">From:</span>
-                <span className="text-white font-medium">{selected.name}</span>
+                <span className="text-muted-foreground">From:</span>
+                <span className="text-foreground font-medium">{selected.name}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-3.5 w-3.5 text-gray-400" />
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 <a
                   href={`mailto:${selected.email}`}
-                  className="text-emerald-400 hover:underline"
+                  className="text-emerald-600 hover:underline"
                 >
                   {selected.email}
                 </a>
               </div>
               {selected.phone && (
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-gray-400">📞</span>
+                  <span className="text-muted-foreground">📞</span>
                   <a
                     href={`tel:${selected.phone}`}
-                    className="text-emerald-400 hover:underline"
+                    className="text-emerald-600 hover:underline"
                   >
                     {selected.phone}
                   </a>
@@ -269,10 +268,10 @@ export default function ContactsPage() {
 
             {/* Message */}
             <div>
-              <h3 className="text-sm font-medium text-gray-400 mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground mb-2">
                 Message
               </h3>
-              <div className="bg-slate-700/30 rounded-lg p-4 text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">
+              <div className="bg-muted rounded-lg p-4 text-foreground text-sm whitespace-pre-wrap leading-relaxed">
                 {selected.message}
               </div>
             </div>
@@ -280,15 +279,15 @@ export default function ContactsPage() {
             {/* Admin Reply (existing) */}
             {selected.adminReply && (
               <div>
-                <h3 className="text-sm font-medium text-emerald-400 mb-2 flex items-center gap-2">
+                <h3 className="text-sm font-medium text-emerald-600 mb-2 flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" /> Your Reply
                   {selected.adminRepliedAt && (
-                    <span className="text-xs text-gray-500 font-normal">
+                    <span className="text-xs text-muted-foreground font-normal">
                       — {new Date(selected.adminRepliedAt).toLocaleString()}
                     </span>
                   )}
                 </h3>
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-foreground text-sm whitespace-pre-wrap leading-relaxed">
                   {selected.adminReply}
                 </div>
               </div>
@@ -296,8 +295,8 @@ export default function ContactsPage() {
 
             {/* Reply Form — only show if not already replied */}
             {selected.status !== "replied" && (
-            <div className="border-t border-slate-700 pt-4">
-              <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+            <div className="border-t border-border pt-4">
+              <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                 <Send className="h-4 w-4" />
                 Write Reply
               </h3>
@@ -305,7 +304,7 @@ export default function ContactsPage() {
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Type your reply here... This will be emailed to the customer."
-                className="bg-slate-700 border-slate-600 text-white resize-none mb-3"
+                className="resize-none mb-3"
                 rows={5}
               />
               <div className="flex items-center justify-end">
@@ -336,18 +335,17 @@ export default function ContactsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <MessageSquare className="h-7 w-7 text-emerald-400" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <MessageSquare className="h-7 w-7 text-emerald-500" />
             Contact Us
           </h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Customer messages from the Contact Us page
           </p>
         </div>
         <Button
           onClick={fetchContacts}
           variant="outline"
-          className="border-slate-600 text-gray-400 hover:text-white"
         >
           <RefreshCw className="h-4 w-4 mr-2" /> Refresh
         </Button>
@@ -358,8 +356,8 @@ export default function ContactsPage() {
         {(["all", "new", "read", "replied", "archived"] as const).map((s) => (
           <Card
             key={s}
-            className={`bg-slate-800/50 border-slate-700 cursor-pointer transition-colors ${
-              filter === s ? "border-emerald-500/50 bg-emerald-500/5" : ""
+            className={`border-0 shadow-sm cursor-pointer transition-all hover:shadow-md ${
+              filter === s ? "ring-2 ring-emerald-500 bg-emerald-50" : ""
             }`}
             onClick={() => setFilter(s)}
           >
@@ -367,15 +365,15 @@ export default function ContactsPage() {
               <p
                 className={`text-xl font-bold ${
                   s === "new"
-                    ? "text-red-400"
+                    ? "text-red-600"
                     : s === "replied"
-                    ? "text-emerald-400"
-                    : "text-white"
+                    ? "text-emerald-600"
+                    : "text-foreground"
                 }`}
               >
                 {statusCounts[s]}
               </p>
-              <p className="text-xs text-gray-400 capitalize">{s}</p>
+              <p className="text-xs text-muted-foreground capitalize">{s}</p>
             </CardContent>
           </Card>
         ))}
@@ -383,18 +381,18 @@ export default function ContactsPage() {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, email, or subject..."
-          className="bg-slate-800 border-slate-700 text-white pl-10"
+          className="pl-10"
         />
       </div>
 
       {/* Query List */}
       {filtered.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-muted-foreground">
           <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
           <p>No contact queries found</p>
         </div>
@@ -403,7 +401,7 @@ export default function ContactsPage() {
           {filtered.map((contact) => (
             <Card
               key={contact._id}
-              className={`bg-slate-800/50 border-slate-700 cursor-pointer hover:border-slate-600 transition-colors ${
+              className={`border-0 shadow-sm cursor-pointer hover:shadow-md transition-all ${
                 contact.status === "new" ? "border-l-2 border-l-red-500" : ""
               }`}
               onClick={() => viewContact(contact)}
@@ -415,8 +413,8 @@ export default function ContactsPage() {
                       <h3
                         className={`text-sm truncate ${
                           contact.status === "new"
-                            ? "text-white font-semibold"
-                            : "text-gray-300"
+                            ? "text-foreground font-semibold"
+                            : "text-muted-foreground"
                         }`}
                       >
                         {contact.subject}
@@ -428,7 +426,7 @@ export default function ContactsPage() {
                         {contact.status}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-medium">{contact.name}</span>
                       <span>·</span>
                       <span>{contact.email}</span>
@@ -439,12 +437,12 @@ export default function ContactsPage() {
                         </>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
                       {contact.message}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-muted-foreground">
                       {new Date(contact.createdAt).toLocaleDateString()}
                     </span>
                     <Button
@@ -454,7 +452,7 @@ export default function ContactsPage() {
                         e.stopPropagation();
                         handleDelete(contact._id);
                       }}
-                      className="h-7 w-7 p-0 text-gray-500 hover:text-red-400"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

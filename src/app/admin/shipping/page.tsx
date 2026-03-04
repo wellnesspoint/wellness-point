@@ -126,11 +126,11 @@ export default function ShippingSettingsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Truck className="h-7 w-7 text-emerald-400" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Truck className="h-7 w-7 text-emerald-500" />
             Shipping Settings
           </h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Configure shipping rates, delivery times, and zones
           </p>
         </div>
@@ -151,17 +151,17 @@ export default function ShippingSettingsPage() {
       </div>
 
       {/* General Settings */}
-      <Card className="bg-slate-800/50 border-slate-700">
+      <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Package className="h-5 w-5 text-emerald-400" />
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <Package className="h-5 w-5 text-emerald-500" />
             General Shipping
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-gray-300">
+              <Label className="text-foreground">
                 Flat Shipping Rate (₹)
               </Label>
               <Input
@@ -174,15 +174,14 @@ export default function ShippingSettingsPage() {
                     flatRate: parseFloat(e.target.value) || 0,
                   })
                 }
-                className="bg-slate-700 border-slate-600 text-white"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Default shipping charge applied to all orders
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-gray-300">
+              <Label className="text-foreground">
                 Free Shipping Threshold (₹)
               </Label>
               <Input
@@ -196,9 +195,8 @@ export default function ShippingSettingsPage() {
                       parseFloat(e.target.value) || 0,
                   })
                 }
-                className="bg-slate-700 border-slate-600 text-white"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Orders above this amount get free shipping
               </p>
             </div>
@@ -215,9 +213,9 @@ export default function ShippingSettingsPage() {
                   enableFreeShipping: e.target.checked,
                 })
               }
-              className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500"
+              className="h-4 w-4 rounded border-border text-emerald-600 focus:ring-emerald-500"
             />
-            <Label htmlFor="enableFree" className="text-gray-300 cursor-pointer">
+            <Label htmlFor="enableFree" className="text-foreground cursor-pointer">
               Enable free shipping on orders above threshold
             </Label>
           </div>
@@ -225,17 +223,17 @@ export default function ShippingSettingsPage() {
       </Card>
 
       {/* Delivery Times */}
-      <Card className="bg-slate-800/50 border-slate-700">
+      <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Clock className="h-5 w-5 text-blue-400" />
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <Clock className="h-5 w-5 text-blue-500" />
             Delivery Estimates
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-gray-300">
+              <Label className="text-foreground">
                 Min Estimated Days
               </Label>
               <Input
@@ -248,11 +246,10 @@ export default function ShippingSettingsPage() {
                     estimatedDays: parseInt(e.target.value) || 1,
                   })
                 }
-                className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-gray-300">
+              <Label className="text-foreground">
                 Max Estimated Days
               </Label>
               <Input
@@ -265,37 +262,36 @@ export default function ShippingSettingsPage() {
                     estimatedDaysMax: parseInt(e.target.value) || 1,
                   })
                 }
-                className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-gray-300">Shipping Note</Label>
+            <Label className="text-foreground">Shipping Note</Label>
             <Textarea
               value={settings.shippingNote}
               onChange={(e) =>
                 setSettings({ ...settings, shippingNote: e.target.value })
               }
               placeholder="Displayed to customers at checkout..."
-              className="bg-slate-700 border-slate-600 text-white resize-none"
+              className="resize-none"
               rows={2}
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               This message is shown to customers on the product and checkout pages
             </p>
           </div>
 
-          <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
-            <p className="text-sm text-gray-300">
+          <div className="bg-muted rounded-lg p-4 border border-border">
+            <p className="text-sm text-foreground">
               <strong>Preview:</strong> Estimated delivery in{" "}
-              <span className="text-emerald-400 font-semibold">
+              <span className="text-emerald-600 font-semibold">
                 {settings.estimatedDays}-{settings.estimatedDaysMax} business
                 days
               </span>
             </p>
             {settings.shippingNote && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {settings.shippingNote}
               </p>
             )}
@@ -304,24 +300,24 @@ export default function ShippingSettingsPage() {
       </Card>
 
       {/* Shipping Zones */}
-      <Card className="bg-slate-800/50 border-slate-700">
+      <Card className="border-0 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-white flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-purple-400" />
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-purple-500" />
             Shipping Zones
           </CardTitle>
           <Button
             onClick={addZone}
             size="sm"
             variant="outline"
-            className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/10"
+            className="border-emerald-300 text-emerald-600 hover:bg-emerald-50"
           >
             <Plus className="h-4 w-4 mr-1" /> Add Zone
           </Button>
         </CardHeader>
         <CardContent>
           {settings.zones.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
+            <div className="text-center py-8 text-muted-foreground">
               <MapPin className="h-10 w-10 mx-auto mb-3 opacity-50" />
               <p className="text-sm">No shipping zones configured</p>
               <p className="text-xs mt-1">
@@ -333,24 +329,24 @@ export default function ShippingSettingsPage() {
               {settings.zones.map((zone, index) => (
                 <div
                   key={index}
-                  className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 space-y-4"
+                  className="bg-muted border border-border rounded-lg p-4 space-y-4"
                 >
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium text-gray-300">
+                    <h4 className="text-sm font-medium text-foreground">
                       Zone #{index + 1}
                     </h4>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => removeZone(index)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-gray-400 text-xs">
+                      <Label className="text-muted-foreground text-xs">
                         Zone Name
                       </Label>
                       <Input
@@ -359,11 +355,10 @@ export default function ShippingSettingsPage() {
                           updateZone(index, "name", e.target.value)
                         }
                         placeholder="e.g. North India"
-                        className="bg-slate-600 border-slate-500 text-white"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-gray-400 text-xs">
+                      <Label className="text-muted-foreground text-xs">
                         Shipping Rate (₹)
                       </Label>
                       <Input
@@ -377,11 +372,10 @@ export default function ShippingSettingsPage() {
                             parseFloat(e.target.value) || 0
                           )
                         }
-                        className="bg-slate-600 border-slate-500 text-white"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-gray-400 text-xs">
+                      <Label className="text-muted-foreground text-xs">
                         Est. Delivery (days)
                       </Label>
                       <Input
@@ -395,12 +389,11 @@ export default function ShippingSettingsPage() {
                             parseInt(e.target.value) || 1
                           )
                         }
-                        className="bg-slate-600 border-slate-500 text-white"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-gray-400 text-xs">
+                    <Label className="text-muted-foreground text-xs">
                       States (comma-separated)
                     </Label>
                     <Input
@@ -416,7 +409,6 @@ export default function ShippingSettingsPage() {
                         )
                       }
                       placeholder="e.g. Delhi, Haryana, Punjab, Uttar Pradesh"
-                      className="bg-slate-600 border-slate-500 text-white"
                     />
                   </div>
                 </div>
