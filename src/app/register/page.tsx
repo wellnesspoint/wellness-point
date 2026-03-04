@@ -119,6 +119,7 @@ export default function RegisterPage() {
               </svg>
               Google
             </Button>
+            {/* Facebook login — commented out until Facebook Developer API key is set up
             <Button
               variant="outline"
               onClick={() => handleSocialLogin("facebook")}
@@ -129,6 +130,7 @@ export default function RegisterPage() {
               </svg>
               Facebook
             </Button>
+            */}
           </div>
 
           <div className="relative">

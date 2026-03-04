@@ -144,6 +144,7 @@ function LoginForm() {
               </svg>
               Google
             </Button>
+            {/* Facebook login — commented out until Facebook Developer API key is set up
             <Button
               variant="outline"
               onClick={() => handleSocialLogin("facebook")}
@@ -154,6 +155,7 @@ function LoginForm() {
               </svg>
               Facebook
             </Button>
+            */}
           </div>
 
           <div className="relative">
