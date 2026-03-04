@@ -189,7 +189,9 @@ export async function POST(req: NextRequest) {
       shippingAddress: orderData.shippingAddress,
       discount: 0,
       createdAt: order.createdAt,
-    }).catch(() => {}); // Don't fail the order if email fails
+    }).catch((err) => {
+      console.error("Order confirmation email failed:", err);
+    });
 
     return NextResponse.json({
       success: true,

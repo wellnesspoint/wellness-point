@@ -7,8 +7,8 @@ import nodemailer from "nodemailer";
 function getTransporter() {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_SUPPORT_USER;
+  const pass = process.env.SMTP_SUPPORT_PASS;
 
   if (!host || !user || !pass) return null;
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     const fromAddress =
-      process.env.SMTP_FROM || "Wellness Point <support@wellness-point.in>";
+      process.env.SMTP_FROM_SUPPORT || "Wellness Point <support@wellness-point.in>";
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wellness-point.in";
 
     let sent = 0;

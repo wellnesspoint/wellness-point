@@ -6,17 +6,21 @@ import { generateInvoicePDF, InvoiceOrderData } from "./invoice";
  *
  * Uses SMTP (works with Gmail, Zoho, SendGrid, Hostinger, etc.)
  * Configure via environment variables:
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+ *   SMTP_HOST, SMTP_PORT, SMTP_SUPPORT_USER, SMTP_SUPPORT_PASS, SMTP_FROM_SUPPORT
+ *   SMTP_ORDERS_USER, SMTP_ORDERS_PASS, SMTP_FROM_ORDERS
  */
 
 function getTransporter() {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_SUPPORT_USER;
+  const pass = process.env.SMTP_SUPPORT_PASS;
 
   if (!host || !user || !pass) {
-    console.warn("SMTP not configured. Emails will not be sent.");
+    console.warn(
+      "SMTP not configured. Emails will not be sent.",
+      { host: !!host, user: !!user, pass: !!pass }
+    );
     return null;
   }
 
@@ -31,11 +35,14 @@ function getTransporter() {
 function getSalesTransporter() {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_SALES_USER;
-  const pass = process.env.SMTP_SALES_PASS;
+  const user = process.env.SMTP_ORDERS_USER;
+  const pass = process.env.SMTP_ORDERS_PASS;
 
   if (!host || !user || !pass) {
-    console.warn("Sales SMTP not configured. Falling back to default.");
+    console.warn(
+      "Orders SMTP not configured. Falling back to support transporter.",
+      { host: !!host, user: !!user, pass: !!pass }
+    );
     return getTransporter();
   }
 
@@ -48,10 +55,10 @@ function getSalesTransporter() {
 }
 
 const FROM_ADDRESS =
-  process.env.SMTP_FROM || "Wellness Point <support@wellness-point.in>";
+  process.env.SMTP_FROM_SUPPORT || "Wellness Point <support@wellness-point.in>";
 
 const FROM_ADDRESS_SALES =
-  process.env.SMTP_FROM_SALES || "Wellness Point <sales@wellness-point.in>";
+  process.env.SMTP_FROM_ORDERS || "Wellness Point <orders@wellness-point.in>";
 
 // ─── Email templates ──────────────────────────────────────────────
 
