@@ -41,3 +41,25 @@ export async function verifyAdminToken(): Promise<AdminPayload | null> {
 export function getAdminCookieName() {
     return ADMIN_COOKIE;
 }
+
+// Short-lived token for 2FA pending state (5 minutes)
+interface Pending2FAPayload {
+    id: string;
+    email: string;
+    name: string;
+    pending2FA: true;
+}
+
+export function signPending2FAToken(payload: Omit<Pending2FAPayload, "pending2FA">): string {
+    return jwt.sign({ ...payload, pending2FA: true }, getSecret(), { expiresIn: "5m" });
+}
+
+export function verifyPending2FAToken(token: string): Pending2FAPayload | null {
+    try {
+        const decoded = jwt.verify(token, getSecret()) as Pending2FAPayload;
+        if (!decoded.pending2FA) return null;
+        return decoded;
+    } catch {
+        return null;
+    }
+}

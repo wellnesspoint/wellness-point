@@ -41,6 +41,7 @@ const adminLinks = [
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone },
   { href: "/admin/shipping", label: "Shipping", icon: Truck },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "/admin/security", label: "Security", icon: ShieldCheck },
 ];
 
 interface AdminUser {

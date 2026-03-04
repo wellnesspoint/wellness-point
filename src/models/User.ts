@@ -25,6 +25,9 @@ export interface IUser extends Document {
   emailVerifyExpires?: Date;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  twoFactorSecret?: string;
+  twoFactorEnabled: boolean;
+  twoFactorBackupCodes?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -69,6 +72,9 @@ const userSchema = new Schema<IUser>(
     emailVerifyExpires: { type: Date },
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
+    twoFactorSecret: { type: String, select: false },
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorBackupCodes: { type: [String], select: false },
   },
   {
     timestamps: true,

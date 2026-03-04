@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
-import { signAdminToken, getAdminCookieName } from "@/lib/admin-auth";
+import { signAdminToken, getAdminCookieName, signPending2FAToken } from "@/lib/admin-auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -60,6 +60,22 @@ export async function POST(req: NextRequest) {
                 { error: "Account has been deactivated" },
                 { status: 403 }
             );
+        }
+
+        // Check if 2FA is enabled (and not bypassed via env)
+        const bypass2FA = process.env.DISABLE_ADMIN_2FA === "true";
+        if (user.twoFactorEnabled && !bypass2FA) {
+            // Return a short-lived pending token — client must verify TOTP next
+            const pendingToken = signPending2FAToken({
+                id: user._id.toString(),
+                email: user.email,
+                name: user.name,
+            });
+
+            return NextResponse.json({
+                requires2FA: true,
+                pendingToken,
+            });
         }
 
         // Sign JWT
