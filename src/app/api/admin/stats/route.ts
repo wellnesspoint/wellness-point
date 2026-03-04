@@ -13,11 +13,19 @@ export async function GET() {
   await connectDB();
 
   try {
-    // Get today's date range
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    // Get today's date range in IST (UTC+5:30)
+    // Vercel runs in UTC, so we must offset for Indian Standard Time
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const nowUTC = new Date();
+    const nowIST = new Date(nowUTC.getTime() + IST_OFFSET_MS);
+    // Start of today IST = midnight IST converted back to UTC
+    const todayStart = new Date(
+      Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate()) - IST_OFFSET_MS
+    );
+    // End of today IST = 23:59:59.999 IST converted back to UTC
+    const todayEnd = new Date(
+      Date.UTC(nowIST.getUTCFullYear(), nowIST.getUTCMonth(), nowIST.getUTCDate(), 23, 59, 59, 999) - IST_OFFSET_MS
+    );
 
     // Parallel queries
     const [
@@ -103,6 +111,7 @@ export async function GET() {
     return NextResponse.json({
       totalRevenue,
       todaySales,
+      todayOrderCount: todayOrders.length,
       totalOrders: orders.length,
       pendingOrders,
       totalCustomers,

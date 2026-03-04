@@ -22,6 +22,7 @@ import Link from "next/link";
 interface Stats {
   totalRevenue: number;
   todaySales: number;
+  todayOrderCount: number;
   totalOrders: number;
   pendingOrders: number;
   totalCustomers: number;
@@ -38,6 +39,7 @@ interface Stats {
 const defaultStats: Stats = {
   totalRevenue: 0,
   todaySales: 0,
+  todayOrderCount: 0,
   totalOrders: 0,
   pendingOrders: 0,
   totalCustomers: 0,
@@ -74,6 +76,7 @@ export default function AdminDashboard() {
     {
       title: "Total Revenue",
       value: `₹${stats.totalRevenue.toLocaleString("en-IN")}`,
+      subtitle: `${stats.paidOrders} paid orders`,
       icon: IndianRupee,
       color: "text-emerald-600 bg-emerald-50",
       href: "/admin/payments",
@@ -81,6 +84,7 @@ export default function AdminDashboard() {
     {
       title: "Today's Sales",
       value: `₹${stats.todaySales.toLocaleString("en-IN")}`,
+      subtitle: `${stats.todayOrderCount} order${stats.todayOrderCount !== 1 ? "s" : ""} today`,
       icon: TrendingUp,
       color: "text-blue-600 bg-blue-50",
       href: "/admin/payments",
@@ -88,6 +92,7 @@ export default function AdminDashboard() {
     {
       title: "Total Orders",
       value: stats.totalOrders,
+      subtitle: `${stats.pendingOrders} pending`,
       icon: ShoppingBag,
       color: "text-purple-600 bg-purple-50",
       href: "/admin/orders",
@@ -171,6 +176,9 @@ export default function AdminDashboard() {
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">{card.title}</p>
+                  {"subtitle" in card && card.subtitle && !loading && (
+                    <p className="text-[10px] text-muted-foreground/70">{card.subtitle}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
