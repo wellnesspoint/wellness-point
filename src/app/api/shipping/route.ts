@@ -9,19 +9,17 @@ import ShippingSettings from "@/models/ShippingSettings";
 export async function GET() {
   try {
     await connectDB();
-    let settings = await ShippingSettings.findOne().lean();
+    type ShippingConfig = { flatRate: number; freeShippingThreshold: number; enableFreeShipping: boolean; estimatedDays: number; estimatedDaysMax: number; shippingNote: string };
+    const raw = await ShippingSettings.findOne().lean() as ShippingConfig | null;
 
-    if (!settings) {
-      // Return sensible defaults if admin hasn't configured yet
-      settings = {
-        flatRate: 50,
-        freeShippingThreshold: 499,
-        enableFreeShipping: true,
-        estimatedDays: 5,
-        estimatedDaysMax: 7,
-        shippingNote: "Ships within 2-3 business days",
-      } as any;
-    }
+    const settings: ShippingConfig = raw ?? {
+      flatRate: 50,
+      freeShippingThreshold: 499,
+      enableFreeShipping: true,
+      estimatedDays: 5,
+      estimatedDaysMax: 7,
+      shippingNote: "Ships within 2-3 business days",
+    };
 
     return NextResponse.json({
       flatRate: settings.flatRate,

@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         if (shippingConfig.enableFreeShipping && subtotal >= (shippingConfig.freeShippingThreshold ?? 999)) {
           shipping = 0;
         } else {
-          shipping = shippingConfig.flatRate;
+          shipping = shippingConfig.flatRate ?? 50;
         }
       } else {
         shipping = subtotal >= 999 ? 0 : 99;
