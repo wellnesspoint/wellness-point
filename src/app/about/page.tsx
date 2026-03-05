@@ -1,5 +1,4 @@
 import React from "react";
-import Image from "next/image";
 import { Heart, Award, Users, Target } from "lucide-react";
 import type { Metadata } from "next";
 

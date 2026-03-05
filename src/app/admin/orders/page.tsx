@@ -8,8 +8,6 @@ import {
   ShoppingBag,
   Search,
   Download,
-  ChevronDown,
-  X,
   Package,
   Truck,
   CheckCircle,
@@ -730,12 +728,12 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {["all", ...orderStatusOptions].map((s) => (
           <button
             key={s}
             onClick={() => setFilterStatus(s)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${filterStatus === s
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${filterStatus === s
               ? "bg-emerald-600 text-white"
               : "bg-muted text-muted-foreground hover:bg-slate-200"
               }`}
@@ -797,7 +795,7 @@ export default function AdminOrdersPage() {
                       value={order.paymentStatus}
                       onChange={(e) => updateOrderStatus(order._id, "paymentStatus", e.target.value)}
                       disabled={updating === order._id}
-                      className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium capitalize cursor-pointer ${statusColor[order.paymentStatus] || "bg-muted text-foreground"
+                      className={`rounded-full border-0 px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer ${statusColor[order.paymentStatus] || "bg-muted text-foreground"
                         }`}
                     >
                       {paymentStatusOptions.map((s) => (
@@ -810,7 +808,7 @@ export default function AdminOrdersPage() {
                       value={order.orderStatus}
                       onChange={(e) => updateOrderStatus(order._id, "orderStatus", e.target.value)}
                       disabled={updating === order._id}
-                      className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium capitalize cursor-pointer ${statusColor[order.orderStatus] || "bg-muted text-foreground"
+                      className={`rounded-full border-0 px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer ${statusColor[order.orderStatus] || "bg-muted text-foreground"
                         }`}
                     >
                       {orderStatusOptions.map((s) => (

@@ -10,7 +10,6 @@ import {
   IndianRupee,
   Download,
   Search,
-  CheckCircle,
   XCircle,
   Clock,
   AlertTriangle,
@@ -221,7 +220,7 @@ export default function AdminPaymentsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search transaction ID, name..."
@@ -230,31 +229,31 @@ export default function AdminPaymentsPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <Input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="w-36"
+            className="w-32 sm:w-36"
           />
           <span className="text-xs text-muted-foreground">to</span>
           <Input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="w-36"
+            className="w-32 sm:w-36"
           />
         </div>
       </div>
 
       {/* Payment filter tabs */}
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {["all", "paid", "pending", "failed", "refunded"].map((s) => (
           <button
             key={s}
             onClick={() => setFilterPayment(s)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${filterPayment === s
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${filterPayment === s
                 ? "bg-emerald-600 text-white"
                 : "bg-muted text-muted-foreground hover:bg-accent"
               }`}

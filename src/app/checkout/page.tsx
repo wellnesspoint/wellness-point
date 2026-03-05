@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingBag, CreditCard, MapPin, ArrowLeft, Minus, Plus, Trash2, Save } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -516,7 +517,7 @@ export default function CheckoutPage() {
 
         {/* Right – Summary */}
         <div>
-          <Card className="sticky top-24 border-0 shadow-sm">
+          <Card className="sticky top-20 border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShoppingBag className="h-5 w-5 text-wellness-600" />
@@ -529,11 +530,15 @@ export default function CheckoutPage() {
                   key={item._id}
                   className="flex items-center gap-3"
                 >
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="h-12 w-12 rounded-lg object-cover"
-                  />
+                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                    <Image
+                      src={item.image}
+                      alt={item.name}
+                      fill
+                      className="object-cover"
+                      sizes="48px"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-medium">
                       {item.name}
@@ -541,26 +546,26 @@ export default function CheckoutPage() {
                     <div className="flex items-center gap-2 mt-1">
                       <button
                         onClick={() => updateQuantity(item._id, item.quantity - 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
+                        className="flex h-8 w-8 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
                         aria-label="Decrease quantity"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Minus className="h-3.5 w-3.5" />
                       </button>
                       <span className="min-w-[20px] text-center text-xs font-medium">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item._id, item.quantity + 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
+                        className="flex h-8 w-8 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
                         disabled={item.quantity >= item.stock}
                         aria-label="Increase quantity"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => removeItem(item._id)}
-                        className="ml-1 flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-red-50 hover:text-red-500"
+                        className="ml-1 flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-red-50 hover:text-red-500"
                         aria-label="Remove item"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>

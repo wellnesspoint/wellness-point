@@ -53,7 +53,7 @@ export default function FAQPreview() {
                                         onClick={() =>
                                             setOpenIndex(isOpen ? null : index)
                                         }
-                                        className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-wellness-50/50"
+                                        className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-wellness-50/50 sm:px-6 sm:py-5"
                                     >
                                         <span className="pr-4 font-heading text-base font-semibold text-heading">
                                             {faq.question}
@@ -64,10 +64,10 @@ export default function FAQPreview() {
                                         />
                                     </button>
                                     <div
-                                        className={`overflow-hidden transition-all duration-200 ${isOpen ? "max-h-40" : "max-h-0"
+                                        className={`overflow-hidden transition-all duration-200 ${isOpen ? "max-h-60" : "max-h-0"
                                             }`}
                                     >
-                                        <p className="px-6 pb-5 text-sm leading-relaxed text-muted-foreground">
+                                        <p className="px-4 pb-4 text-sm leading-relaxed text-muted-foreground sm:px-6 sm:pb-5">
                                             {faq.answer}
                                         </p>
                                     </div>

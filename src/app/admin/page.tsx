@@ -14,8 +14,6 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  ArrowUpRight,
-  ArrowDownRight,
 } from "lucide-react";
 import Link from "next/link";
 

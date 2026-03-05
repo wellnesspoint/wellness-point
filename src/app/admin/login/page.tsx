@@ -179,7 +179,7 @@ export default function AdminLoginPage() {
 
           {/* Login Form */}
           {!requires2FA ? (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5" suppressHydrationWarning>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-300">
                   Admin Email
@@ -193,6 +193,7 @@ export default function AdminLoginPage() {
                     placeholder="Enter admin email"
                     className="w-full rounded-xl bg-white/5 border border-white/10 px-10 py-3 text-white placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-colors"
                     autoComplete="email"
+                    suppressHydrationWarning
                   />
                 </div>
               </div>
@@ -210,6 +211,7 @@ export default function AdminLoginPage() {
                     placeholder="••••••••"
                     className="w-full rounded-xl bg-white/5 border border-white/10 px-10 py-3 text-white placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-colors"
                     autoComplete="current-password"
+                    suppressHydrationWarning
                   />
                   <button
                     type="button"

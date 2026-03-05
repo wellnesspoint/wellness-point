@@ -22,7 +22,6 @@ import {
   Megaphone,
   LogOut,
   ShieldCheck,
-  Bell,
   ChevronDown,
   MessageCircle,
 } from "lucide-react";
@@ -126,7 +125,7 @@ export default function AdminLayout({
 
   return (
     <div
-      className="flex h-screen bg-muted/50"
+      className="flex min-h-screen bg-muted/50"
       style={{ "--accent": "210 40% 94%", "--accent-foreground": "215 16% 35%" } as React.CSSProperties}
     >
       {/* Mobile Overlay */}
@@ -157,7 +156,7 @@ export default function AdminLayout({
               <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Admin Panel</p>
             </div>
             {/* Mobile close */}
-            <button onClick={() => setSidebarOpen(false)} className="ml-auto lg:hidden">
+            <button onClick={() => setSidebarOpen(false)} className="ml-auto rounded-lg p-1.5 hover:bg-accent lg:hidden">
               <X className="h-5 w-5 text-muted-foreground" />
             </button>
           </div>
@@ -202,7 +201,7 @@ export default function AdminLayout({
         <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 sm:px-6">
           {/* Left: Mobile menu + page title */}
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden">
+            <button onClick={() => setSidebarOpen(true)} className="rounded-lg p-1.5 hover:bg-accent lg:hidden">
               <Menu className="h-5 w-5 text-muted-foreground" />
             </button>
             <div>

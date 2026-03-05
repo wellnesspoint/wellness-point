@@ -118,9 +118,9 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={social.label}
-                  className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-muted-foreground transition-all duration-200 hover:bg-white/20 hover:scale-110 ${social.hoverColor}`}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-muted-foreground transition-all duration-200 hover:bg-white/20 hover:scale-110 ${social.hoverColor}`}
                 >
-                  <social.icon className="h-4 w-4" />
+                  <social.icon className="h-5 w-5" />
                 </a>
               ))}
             </div>

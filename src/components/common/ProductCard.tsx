@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Heart, ShoppingCart, Star, Zap } from "lucide-react";
+import { Heart, ShoppingCart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -26,33 +26,22 @@ interface ProductCardProps {
     reviewCount: number;
     stock: number;
   };
-  onWishlist?: () => void;
+  isWishlisted?: boolean;
+  onWishlistChange?: () => void;
 }
 
-export default function ProductCard({ product, onWishlist }: ProductCardProps) {
+export default function ProductCard({ product, isWishlisted = false, onWishlistChange }: ProductCardProps) {
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
   const router = useRouter();
   const { data: session } = useSession();
-  const [wishlisted, setWishlisted] = useState(false);
+  const [wishlisted, setWishlisted] = useState(isWishlisted);
   const [wishLoading, setWishLoading] = useState(false);
 
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
   const discountPercent = hasDiscount
     ? getDiscountPercentage(product.price, product.discountPrice!)
     : 0;
-
-  // Check if already in wishlist on mount
-  useEffect(() => {
-    if (!session) return;
-    fetch("/api/wishlist")
-      .then((r) => r.json())
-      .then((data) => {
-        const ids = (data.products || []).map((p: any) => p._id || p);
-        setWishlisted(ids.includes(product._id));
-      })
-      .catch(() => { });
-  }, [session, product._id]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -89,7 +78,7 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
       });
       setWishlisted(!wishlisted);
       toast.success(wishlisted ? "Removed from wishlist" : "Added to wishlist");
-      onWishlist?.();
+      onWishlistChange?.();
     } catch {
       toast.error("Failed to update wishlist");
     } finally {
@@ -119,11 +108,11 @@ export default function ProductCard({ product, onWishlist }: ProductCardProps) {
       <button
         onClick={handleWishlist}
         disabled={wishLoading}
-        className={`absolute right-3 top-3 z-10 rounded-full bg-background/80 p-2 shadow-sm backdrop-blur-sm transition-all hover:bg-background ${wishlisted ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+        className={`absolute right-3 top-3 z-10 rounded-full bg-background/80 p-2.5 shadow-sm backdrop-blur-sm transition-all hover:bg-background ${wishlisted ? "text-red-500" : "text-muted-foreground hover:text-red-500"
           }`}
         aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
       >
-        <Heart className={`h-4 w-4 ${wishlisted ? "fill-red-500" : ""}`} />
+        <Heart className={`h-5 w-5 ${wishlisted ? "fill-red-500" : ""}`} />
       </button>
 
       {/* Image */}

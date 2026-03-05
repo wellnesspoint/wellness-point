@@ -15,10 +15,6 @@ import {
   Package,
   Search,
   Upload,
-  ImageIcon,
-  Eye,
-  EyeOff,
-  AlertTriangle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -303,6 +299,7 @@ export default function AdminProductsPage() {
                 setShowForm(false);
                 setEditId(null);
               }}
+              className="rounded-lg p-1.5 hover:bg-accent"
             >
               <X className="h-5 w-5 text-muted-foreground" />
             </button>
@@ -404,9 +401,9 @@ export default function AdminProductsPage() {
                           <button
                             type="button"
                             onClick={() => removeExistingImage(idx)}
-                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1.5 text-white shadow-sm"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
@@ -426,9 +423,9 @@ export default function AdminProductsPage() {
                           <button
                             type="button"
                             onClick={() => removeNewImage(idx)}
-                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1.5 text-white shadow-sm"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}

@@ -160,7 +160,7 @@ function CartItemCard({
           </Link>
           <button
             onClick={onRemove}
-            className="text-muted-foreground hover:text-red-500"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-500"
             aria-label={`Remove ${item.name}`}
           >
             <X className="h-4 w-4" />
@@ -170,10 +170,10 @@ function CartItemCard({
           <div className="flex items-center gap-1 rounded-lg border border-border">
             <button
               onClick={() => onUpdateQuantity(item.quantity - 1)}
-              className="p-1.5 text-muted-foreground hover:text-foreground"
+              className="p-2.5 text-muted-foreground hover:text-foreground"
               aria-label="Decrease quantity"
             >
-              <Minus className="h-3 w-3" />
+              <Minus className="h-3.5 w-3.5" />
             </button>
             <span className="min-w-[24px] text-center text-sm font-medium text-foreground">
               {item.quantity}
@@ -181,10 +181,10 @@ function CartItemCard({
             <button
               onClick={() => onUpdateQuantity(item.quantity + 1)}
               disabled={item.quantity >= item.stock}
-              className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
+              className="p-2.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
               aria-label="Increase quantity"
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
           <span className="text-sm font-semibold text-wellness-600">

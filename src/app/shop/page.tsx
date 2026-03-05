@@ -1,13 +1,25 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductCard from "@/components/common/ProductCard";
-import type { Metadata } from "next";
 
 export default function ShopPage() {
+  const { data: session } = useSession();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+
+  const fetchWishlist = useCallback(async () => {
+    if (!session) return;
+    try {
+      const res = await fetch("/api/wishlist");
+      const data = await res.json();
+      const ids = (data.products || []).map((p: any) => p._id || p);
+      setWishlistIds(new Set(ids));
+    } catch {}
+  }, [session]);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -23,6 +35,10 @@ export default function ShopPage() {
     }
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    fetchWishlist();
+  }, [fetchWishlist]);
 
   return (
     <div className="gradient-wellness min-h-screen py-12">
@@ -56,7 +72,12 @@ export default function ShopPage() {
         ) : products.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {products.map((product) => (
-              <ProductCard key={product._id} product={product} />
+              <ProductCard
+                key={product._id}
+                product={product}
+                isWishlisted={wishlistIds.has(product._id)}
+                onWishlistChange={fetchWishlist}
+              />
             ))}
           </div>
         ) : (

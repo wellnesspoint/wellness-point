@@ -2,22 +2,37 @@
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import ProductCard from "@/components/common/ProductCard";
 
+const MAX_CAROUSEL_PRODUCTS = 12;
+
 export default function FeaturedProducts() {
+  const { data: session } = useSession();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const fetchWishlist = useCallback(async () => {
+    if (!session) return;
+    try {
+      const res = await fetch("/api/wishlist");
+      const data = await res.json();
+      const ids = (data.products || []).map((p: any) => p._id || p);
+      setWishlistIds(new Set(ids));
+    } catch {}
+  }, [session]);
 
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const res = await fetch("/api/products?limit=50");
+        const res = await fetch(`/api/products?limit=${MAX_CAROUSEL_PRODUCTS}`);
         const data = await res.json();
-        setProducts(data.products || []);
+        setProducts((data.products || []).slice(0, MAX_CAROUSEL_PRODUCTS));
       } catch {
         setProducts([]);
       } finally {
@@ -26,6 +41,10 @@ export default function FeaturedProducts() {
     }
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    fetchWishlist();
+  }, [fetchWishlist]);
 
   // Infinite loop: render 3 copies and keep scroll centered on the middle copy
   const tripled =
@@ -150,9 +169,13 @@ export default function FeaturedProducts() {
             {tripled.map((product, idx) => (
               <div
                 key={`${product._id}-${idx}`}
-                className="w-[260px] flex-shrink-0 sm:w-[280px]"
+                className="w-[240px] flex-shrink-0 sm:w-[280px]"
               >
-                <ProductCard product={product} />
+                <ProductCard
+                  product={product}
+                  isWishlisted={wishlistIds.has(product._id)}
+                  onWishlistChange={fetchWishlist}
+                />
               </div>
             ))}
           </div>
@@ -165,7 +188,17 @@ export default function FeaturedProducts() {
         </div>
       )}
 
-
+      {/* View All CTA */}
+      {!loading && products.length > 0 && (
+        <div className="mt-8 text-center">
+          <Button variant="outline" asChild className="border-wellness-300 text-wellness-700 hover:bg-wellness-50">
+            <Link href="/shop" className="flex items-center gap-2">
+              View All Products
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

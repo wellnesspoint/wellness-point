@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useCartStore } from "@/store/cart";
@@ -341,38 +340,40 @@ export default function ProductDetailClient({
         {/* Detailed Tabs */}
         <div className="mt-16">
           <Tabs defaultValue="description" className="w-full">
-            <TabsList className="w-full justify-start border-b bg-transparent p-0">
-              <TabsTrigger
-                value="description"
-                className="rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
-              >
-                Description
-              </TabsTrigger>
-              <TabsTrigger
-                value="ingredients"
-                className="rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
-              >
-                Ingredients
-              </TabsTrigger>
-              <TabsTrigger
-                value="benefits"
-                className="rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
-              >
-                Benefits
-              </TabsTrigger>
-              <TabsTrigger
-                value="usage"
-                className="rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
-              >
-                How to Use
-              </TabsTrigger>
-              <TabsTrigger
-                value="reviews"
-                className="rounded-none border-b-2 border-transparent px-6 py-3 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
-              >
-                Reviews ({product.reviewCount})
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+              <TabsList className="w-max sm:w-full justify-start border-b bg-transparent p-0">
+                <TabsTrigger
+                  value="description"
+                  className="rounded-none border-b-2 border-transparent px-4 py-3 text-sm sm:px-6 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
+                >
+                  Description
+                </TabsTrigger>
+                <TabsTrigger
+                  value="ingredients"
+                  className="rounded-none border-b-2 border-transparent px-4 py-3 text-sm sm:px-6 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
+                >
+                  Ingredients
+                </TabsTrigger>
+                <TabsTrigger
+                  value="benefits"
+                  className="rounded-none border-b-2 border-transparent px-4 py-3 text-sm sm:px-6 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
+                >
+                  Benefits
+                </TabsTrigger>
+                <TabsTrigger
+                  value="usage"
+                  className="rounded-none border-b-2 border-transparent px-4 py-3 text-sm sm:px-6 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
+                >
+                  How to Use
+                </TabsTrigger>
+                <TabsTrigger
+                  value="reviews"
+                  className="rounded-none border-b-2 border-transparent px-4 py-3 text-sm sm:px-6 data-[state=active]:border-wellness-600 data-[state=active]:bg-transparent"
+                >
+                  Reviews ({product.reviewCount})
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="description" className="mt-6">
               <div className="prose max-w-none text-muted-foreground">
@@ -497,10 +498,10 @@ export default function ProductDetailClient({
                               key={i}
                               type="button"
                               onClick={() => setReviewForm({ ...reviewForm, rating: i + 1 })}
-                              className="transition-transform hover:scale-110"
+                              className="p-0.5 transition-transform hover:scale-110"
                             >
                               <Star
-                                className={`h-7 w-7 ${i < reviewForm.rating
+                                className={`h-8 w-8 ${i < reviewForm.rating
                                     ? "fill-yellow-400 text-yellow-400"
                                     : "fill-muted text-muted hover:fill-yellow-200 hover:text-yellow-200"
                                   }`}

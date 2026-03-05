@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { SITE_CONFIG } from "@/lib/constants";
@@ -55,6 +55,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#358e53",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -66,7 +73,6 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="msapplication-TileColor" content="#358e53" />
         <meta name="msapplication-TileImage" content="/favicon.png" />
-        <meta name="theme-color" content="#358e53" />
       </head>
       <body className="min-h-screen font-sans">
         <Providers>{children}</Providers>

@@ -93,11 +93,11 @@ export default function RegisterPage() {
 
         <CardContent className="space-y-4">
           {/* Social Logins */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex justify-center gap-3">
             <Button
               variant="outline"
               onClick={() => handleSocialLogin("google")}
-              className="h-11"
+              className="h-11 w-full max-w-xs"
             >
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
                 <path
