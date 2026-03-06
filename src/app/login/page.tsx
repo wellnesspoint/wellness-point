@@ -118,11 +118,11 @@ function LoginForm() {
 
         <CardContent className="space-y-4">
           {/* Social Logins */}
-          <div className="flex justify-center gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
               onClick={() => handleSocialLogin("google")}
-              className="h-11 w-full max-w-xs"
+              className="h-11"
             >
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
                 <path
@@ -144,7 +144,6 @@ function LoginForm() {
               </svg>
               Google
             </Button>
-            {/* Facebook login — commented out until Facebook Developer API key is set up
             <Button
               variant="outline"
               onClick={() => handleSocialLogin("facebook")}
@@ -155,7 +154,6 @@ function LoginForm() {
               </svg>
               Facebook
             </Button>
-            */}
           </div>
 
           <div className="relative">
