@@ -12,9 +12,9 @@ export default function HeroSection() {
       <div className="absolute -left-20 bottom-0 h-[400px] w-[400px] rounded-full bg-wellness-50/50 blur-[100px]" />
 
       <div className="container relative mx-auto px-4">
-        <div className="grid min-h-[72vh] items-center gap-12 lg:grid-cols-2">
+        <div className="grid min-h-[60vh] items-center gap-12 lg:grid-cols-2">
           {/* Left: Content */}
-          <div className="flex flex-col justify-center py-16 lg:py-24">
+          <div className="flex flex-col justify-center py-8 lg:py-14">
             <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-wellness-200 bg-wellness-50 px-4 py-1.5 text-sm font-medium text-wellness-700">
               <span className="flex h-2 w-2 rounded-full bg-wellness-500" />
               Trusted by 10,000+ customers
