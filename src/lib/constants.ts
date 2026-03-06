@@ -40,6 +40,7 @@ export const FOOTER_LINKS = {
     { label: "Returns & Refund Policy", href: "/returns-refund-policy" },
     { label: "Shipping Policy", href: "/shipping-policy" },
     { label: "Disclaimer", href: "/disclaimer" },
+    { label: "Data Deletion", href: "/data-deletion" },
   ],
   account: [
     { label: "My Account", href: "/dashboard" },
