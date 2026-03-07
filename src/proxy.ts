@@ -8,7 +8,7 @@ import { getToken } from "next-auth/jwt";
  * - /admin/* → requires admin-token cookie (except /admin/login)
  * - /api/admin/* → requires admin-token cookie (except /api/admin/auth/*)
  */
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // ─── Dashboard routes: require user authentication ───────────────
