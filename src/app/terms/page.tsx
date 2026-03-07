@@ -106,11 +106,27 @@ export default function TermsPage() {
             <p>
               For questions about these Terms &amp; Conditions, contact us at:
             </p>
-            <p>
-              <strong>Email:</strong> support@wellness-point.in
-              <br />
-              <strong>Phone:</strong> +91 87224 85312
-            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                Email:{" "}
+                <a
+                  href="mailto:support@wellness-point.in"
+                  className="text-wellness-600 hover:underline"
+                >
+                  support@wellness-point.in
+                </a>
+              </li>
+              <li>
+                Phone:{" "}
+                <a
+                  href="tel:+918722485312"
+                  className="text-wellness-600 hover:underline"
+                >
+                  +91 87224 85312
+                </a>
+              </li>
+              <li>Address: Bengaluru, Karnataka, India</li>
+            </ul>
           </section>
         </div>
       </div>

@@ -19,6 +19,15 @@ export default function ContactPage() {
     message: "",
   });
 
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidPhone = (phone: string) => /^\d{10}$/.test(phone);
+  const isFormValid =
+    form.name.trim().length > 0 &&
+    isValidEmail(form.email) &&
+    isValidPhone(form.phone) &&
+    form.subject.trim().length > 0 &&
+    form.message.trim().length > 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -133,6 +142,9 @@ export default function ContactPage() {
                         }
                         required
                       />
+                      {form.email && !isValidEmail(form.email) && (
+                        <p className="text-xs text-red-500">Enter a valid email address</p>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -140,13 +152,19 @@ export default function ContactPage() {
                     <Input
                       id="phone"
                       type="tel"
-                      placeholder="+91 XXXXX XXXXX"
+                      placeholder="10-digit phone number"
                       value={form.phone}
-                      onChange={(e) =>
-                        setForm({ ...form, phone: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        setForm({ ...form, phone: val });
+                      }}
+                      maxLength={10}
+                      inputMode="numeric"
                       required
                     />
+                    {form.phone && !isValidPhone(form.phone) && (
+                      <p className="text-xs text-red-500">Phone number must be exactly 10 digits</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="subject">Subject</Label>
@@ -177,14 +195,7 @@ export default function ContactPage() {
                     type="submit"
                     variant="wellness"
                     size="lg"
-                    disabled={
-                      loading ||
-                      !form.name.trim() ||
-                      !form.email.trim() ||
-                      !form.phone.trim() ||
-                      !form.subject.trim() ||
-                      !form.message.trim()
-                    }
+                    disabled={loading || !isFormValid}
                     className="w-full sm:w-auto"
                   >
                     <Send className="mr-2 h-4 w-4" />

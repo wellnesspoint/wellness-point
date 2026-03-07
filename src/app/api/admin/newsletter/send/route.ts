@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
 
     // Send emails in batches to avoid SMTP limits
     for (const sub of subscribers) {
+      const unsubscribeUrl = `${baseUrl}/api/newsletter/unsubscribe?email=${encodeURIComponent(sub.email)}`;
+
       const html = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
           <div style="text-align:center;padding:20px;background:#065f46;border-radius:8px 8px 0 0">
@@ -79,11 +81,12 @@ export async function POST(req: NextRequest) {
             <div style="color:#374151;line-height:1.6">${body.replace(/\n/g, "<br />")}</div>
           </div>
           <div style="text-align:center;padding:16px;color:#9ca3af;font-size:12px">
-            © ${new Date().getFullYear()} Wellness Point. All rights reserved.<br />
-            <a href="${baseUrl}" style="color:#065f46">Visit our store</a>
+            &copy; ${new Date().getFullYear()} Wellness Point. All rights reserved.<br />
+            <a href="${baseUrl}" style="color:#065f46">Visit our store</a><br /><br />
+            <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline">Unsubscribe from newsletter</a>
           </div>
         </div>
-      `;
+      `;   
 
       try {
         await transporter.sendMail({

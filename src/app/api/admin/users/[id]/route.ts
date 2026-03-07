@@ -3,6 +3,8 @@ import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import Order from "@/models/Order";
+import Wishlist from "@/models/Wishlist";
+import Review from "@/models/Review";
 
 export async function GET(
   request: NextRequest,
@@ -100,6 +102,12 @@ export async function DELETE(
         { status: 403 }
       );
     }
+
+    // Cascade delete all user-related data
+    await Promise.all([
+      Wishlist.deleteMany({ user: id }),
+      Review.deleteMany({ user: id }),
+    ]);
 
     await User.findByIdAndDelete(id);
 

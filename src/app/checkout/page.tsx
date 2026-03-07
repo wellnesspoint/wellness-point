@@ -207,12 +207,24 @@ export default function CheckoutPage() {
       toast.error("Please fill in all address fields");
       return false;
     }
+    if (!/^[a-zA-Z\s]+$/.test(address.fullName)) {
+      toast.error("Full name must contain only alphabets");
+      return false;
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) {
       toast.error("Please enter a valid email address");
       return false;
     }
-    if (address.phone.length < 10) {
-      toast.error("Please enter a valid phone number");
+    if (!/^\d{10}$/.test(address.phone)) {
+      toast.error("Phone number must be exactly 10 digits");
+      return false;
+    }
+    if (!/^[a-zA-Z\s]+$/.test(address.city)) {
+      toast.error("City must contain only alphabets");
+      return false;
+    }
+    if (!/^[a-zA-Z\s]+$/.test(address.state)) {
+      toast.error("State must contain only alphabets");
       return false;
     }
     if (!/^\d{6}$/.test(address.pincode)) {
@@ -413,9 +425,10 @@ export default function CheckoutPage() {
                   <Label>Full Name</Label>
                   <Input
                     value={address.fullName}
-                    onChange={(e) =>
-                      updateAddress({ ...address, fullName: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                      updateAddress({ ...address, fullName: val });
+                    }}
                     placeholder="Enter your full name"
                   />
                 </div>
@@ -434,9 +447,12 @@ export default function CheckoutPage() {
                   <Label>Phone Number</Label>
                   <Input
                     value={address.phone}
-                    onChange={(e) =>
-                      updateAddress({ ...address, phone: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      updateAddress({ ...address, phone: val });
+                    }}
+                    maxLength={10}
+                    inputMode="numeric"
                     placeholder="Enter your phone number"
                   />
                 </div>
@@ -464,9 +480,10 @@ export default function CheckoutPage() {
                   <Label>City</Label>
                   <Input
                     value={address.city}
-                    onChange={(e) =>
-                      updateAddress({ ...address, city: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                      updateAddress({ ...address, city: val });
+                    }}
                     placeholder="Enter your city"
                   />
                 </div>
@@ -474,9 +491,10 @@ export default function CheckoutPage() {
                   <Label>State</Label>
                   <Input
                     value={address.state}
-                    onChange={(e) =>
-                      updateAddress({ ...address, state: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                      updateAddress({ ...address, state: val });
+                    }}
                     placeholder="Enter your state"
                   />
                 </div>
