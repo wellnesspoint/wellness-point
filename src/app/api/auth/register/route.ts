@@ -62,15 +62,19 @@ export async function POST(req: NextRequest) {
       emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
-    // Send verification email (non-blocking)
+    // Send verification email (must await on serverless — function ends after response)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wellness-point.in";
     const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verifyToken}&email=${encodeURIComponent(user.email)}`;
 
-    sendEmailVerification({
-      customerName: user.name,
-      customerEmail: user.email,
-      verifyUrl,
-    }).catch((err) => console.error("Failed to send verification email:", err));
+    try {
+      await sendEmailVerification({
+        customerName: user.name,
+        customerEmail: user.email,
+        verifyUrl,
+      });
+    } catch (err) {
+      console.error("Failed to send verification email:", err);
+    }
 
     return NextResponse.json(
       {
