@@ -14,11 +14,14 @@ export async function GET(req: NextRequest) {
     if (featured === "true") filter.isFeatured = true;
 
     const products = await Product.find(filter)
+      .select("name slug price discountPrice images shortDescription rating reviewCount stock isFeatured")
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
 
-    return NextResponse.json({ products });
+    const res = NextResponse.json({ products });
+    res.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    return res;
   } catch (error) {
     console.error("Products fetch error:", error);
     return NextResponse.json(

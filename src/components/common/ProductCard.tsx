@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ interface ProductCardProps {
   onWishlistChange?: () => void;
 }
 
-export default function ProductCard({ product, isWishlisted = false, onWishlistChange }: ProductCardProps) {
+function ProductCard({ product, isWishlisted = false, onWishlistChange }: ProductCardProps) {
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
   const router = useRouter();
@@ -191,4 +191,6 @@ export default function ProductCard({ product, isWishlisted = false, onWishlistC
     </Card>
   );
 }
+
+export default memo(ProductCard);
 

@@ -4,11 +4,16 @@ import React, { useEffect, useState } from "react";
 import { Star, Quote } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function TestimonialsSection() {
-  const [testimonials, setTestimonials] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface TestimonialsSectionProps {
+  initialTestimonials?: any[];
+}
+
+export default function TestimonialsSection({ initialTestimonials }: TestimonialsSectionProps) {
+  const [testimonials, setTestimonials] = useState<any[]>(initialTestimonials || []);
+  const [loading, setLoading] = useState(!initialTestimonials?.length);
 
   useEffect(() => {
+    if (initialTestimonials?.length) return;
     async function fetchTestimonials() {
       try {
         const res = await fetch("/api/testimonials?limit=3");
@@ -21,7 +26,7 @@ export default function TestimonialsSection() {
       }
     }
     fetchTestimonials();
-  }, []);
+  }, [initialTestimonials]);
 
   return (
     <section className="py-14">

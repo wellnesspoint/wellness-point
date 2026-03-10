@@ -1,8 +1,13 @@
-import React from "react";
+import React, { cache } from "react";
 import type { Metadata } from "next";
 import ProductDetailClient from "./ProductDetailClient";
 import connectDB from "@/lib/db";
 import Product from "@/models/Product";
+
+const getProduct = cache(async (slug: string) => {
+  await connectDB();
+  return Product.findOne({ slug, isActive: true }).lean();
+});
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -10,8 +15,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  await connectDB();
-  const product = await Product.findOne({ slug, isActive: true }).lean();
+  const product = await getProduct(slug);
 
   if (!product) {
     return { title: "Product Not Found" };
@@ -35,11 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
-  await connectDB();
-  const product = await Product.findOne({
-    slug,
-    isActive: true,
-  }).lean();
+  const product = await getProduct(slug);
 
   if (!product) {
     return (

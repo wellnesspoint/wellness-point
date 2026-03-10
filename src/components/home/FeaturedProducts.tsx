@@ -10,10 +10,14 @@ import ProductCard from "@/components/common/ProductCard";
 
 const MAX_CAROUSEL_PRODUCTS = 12;
 
-export default function FeaturedProducts() {
+interface FeaturedProductsProps {
+  initialProducts?: any[];
+}
+
+export default function FeaturedProducts({ initialProducts }: FeaturedProductsProps) {
   const { data: session } = useSession();
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<any[]>(initialProducts || []);
+  const [loading, setLoading] = useState(!initialProducts?.length);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -28,6 +32,7 @@ export default function FeaturedProducts() {
   }, [session]);
 
   useEffect(() => {
+    if (initialProducts?.length) return;
     async function fetchProducts() {
       try {
         const res = await fetch(`/api/products?limit=${MAX_CAROUSEL_PRODUCTS}`);
@@ -40,7 +45,7 @@ export default function FeaturedProducts() {
       }
     }
     fetchProducts();
-  }, []);
+  }, [initialProducts]);
 
   useEffect(() => {
     fetchWishlist();

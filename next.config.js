@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  poweredByHeader: false,
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",
@@ -19,9 +21,6 @@ const nextConfig = {
         hostname: "res.cloudinary.com",
       },
     ],
-  },
-  experimental: {
-    serverActions: {},
   },
   async headers() {
     return [

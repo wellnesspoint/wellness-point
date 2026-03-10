@@ -15,7 +15,10 @@ export async function GET() {
 
     const wishlist = await Wishlist.findOne({
       user: (session.user as any).id,
-    }).populate("products");
+    }).populate({
+      path: "products",
+      select: "name slug price discountPrice images shortDescription rating reviewCount stock",
+    }).lean();
 
     return NextResponse.json({
       products: wishlist?.products || [],

@@ -1,31 +1,25 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { Calendar, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import connectDB from "@/lib/db";
+import Blog from "@/models/Blog";
 
-export default function BlogPage() {
-  const [posts, setPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export const metadata: Metadata = {
+  title: "Blog",
+  description:
+    "Tips, insights, and research on nutrition, wellness, and healthy living from Wellness Point.",
+};
 
-  useEffect(() => {
-    async function fetchPosts() {
-      try {
-        const res = await fetch("/api/blogs");
-        const data = await res.json();
-        setPosts(data.blogs || []);
-      } catch {
-        setPosts([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchPosts();
-  }, []);
+export default async function BlogPage() {
+  await connectDB();
+  const posts = await Blog.find({ isPublished: true })
+    .sort({ createdAt: -1 })
+    .select("-content")
+    .lean();
 
   return (
     <div className="gradient-wellness py-16">
@@ -43,21 +37,10 @@ export default function BlogPage() {
           </p>
         </div>
 
-        {loading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-4 rounded-xl border border-border bg-card p-4">
-                <Skeleton className="aspect-video w-full rounded-lg" />
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : posts.length > 0 ? (
+        {posts.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
-              <Link key={post._id} href={`/blog/${post.slug}`}>
+              <Link key={String(post._id)} href={`/blog/${post.slug}`}>
                 <Card
                   className="group overflow-hidden border-0 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg h-full"
                 >

@@ -104,19 +104,27 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         await connectDB();
-        const dbUser = await User.findOne({ email: user.email });
+        const dbUser = await User.findOne({ email: user.email }).select("_id role isActive").lean();
         if (dbUser) {
           token.id = dbUser._id.toString();
           token.role = dbUser.role;
           token.isActive = dbUser.isActive;
+          token.lastChecked = Date.now();
         }
       } else if (token.email) {
-        // Re-check isActive on every token refresh so blocked users get kicked
-        await connectDB();
-        const dbUser = await User.findOne({ email: token.email });
-        if (dbUser && !dbUser.isActive) {
-          // Return empty token to invalidate session
-          return { ...token, isActive: false };
+        // Re-check isActive every 5 minutes instead of on every request
+        const FIVE_MINUTES = 5 * 60 * 1000;
+        const lastChecked = (token.lastChecked as number) || 0;
+        if (Date.now() - lastChecked > FIVE_MINUTES) {
+          await connectDB();
+          const dbUser = await User.findOne({ email: token.email }).select("isActive role").lean();
+          if (dbUser && !dbUser.isActive) {
+            return { ...token, isActive: false };
+          }
+          if (dbUser) {
+            token.role = dbUser.role;
+          }
+          token.lastChecked = Date.now();
         }
       }
       return token;

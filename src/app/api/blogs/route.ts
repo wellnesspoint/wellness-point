@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
       .select("-content")
       .lean();
 
-    return NextResponse.json({ blogs });
+    const res = NextResponse.json({ blogs });
+    res.headers.set("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
+    return res;
   } catch (error) {
     console.error("Blogs fetch error:", error);
     return NextResponse.json(

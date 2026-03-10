@@ -25,6 +25,8 @@ const testimonialSchema = new Schema<ITestimonial>(
   }
 );
 
+testimonialSchema.index({ isApproved: 1, createdAt: -1 });
+
 const Testimonial: Model<ITestimonial> =
   mongoose.models.Testimonial ||
   mongoose.model<ITestimonial>("Testimonial", testimonialSchema);

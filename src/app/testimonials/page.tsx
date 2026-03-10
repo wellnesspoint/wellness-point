@@ -1,27 +1,21 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import React from "react";
+import type { Metadata } from "next";
 import { Star, Quote } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import connectDB from "@/lib/db";
+import Testimonial from "@/models/Testimonial";
 
-export default function TestimonialsPage() {
-  const [testimonials, setTestimonials] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export const metadata: Metadata = {
+  title: "Testimonials",
+  description:
+    "Real stories from real people who transformed their wellness journey with Wellness Point products.",
+};
 
-  useEffect(() => {
-    async function fetchTestimonials() {
-      try {
-        const res = await fetch("/api/testimonials");
-        const data = await res.json();
-        setTestimonials(data.testimonials || []);
-      } catch {
-        setTestimonials([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchTestimonials();
-  }, []);
+export default async function TestimonialsPage() {
+  await connectDB();
+  const testimonials = await Testimonial.find({ isApproved: true })
+    .select("name role content rating")
+    .sort({ createdAt: -1 })
+    .lean();
 
   return (
     <div className="gradient-wellness py-16">
@@ -39,22 +33,11 @@ export default function TestimonialsPage() {
           </p>
         </div>
 
-        {loading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="rounded-2xl border border-border bg-card p-6">
-                <Skeleton className="mb-4 h-4 w-24" />
-                <Skeleton className="mb-2 h-4 w-full" />
-                <Skeleton className="mb-2 h-4 w-5/6" />
-                <Skeleton className="mt-4 h-5 w-32" />
-              </div>
-            ))}
-          </div>
-        ) : testimonials.length > 0 ? (
+        {testimonials.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {testimonials.map((t) => (
               <div
-                key={t._id}
+                key={String(t._id)}
                 className="relative rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
               >
                 <Quote className="absolute right-4 top-4 h-8 w-8 text-wellness-100" />

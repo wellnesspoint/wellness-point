@@ -10,11 +10,14 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
 
     const testimonials = await Testimonial.find({ isApproved: true })
+      .select("name role content rating")
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
 
-    return NextResponse.json({ testimonials });
+    const res = NextResponse.json({ testimonials });
+    res.headers.set("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
+    return res;
   } catch (error) {
     console.error("Testimonials fetch error:", error);
     return NextResponse.json(
