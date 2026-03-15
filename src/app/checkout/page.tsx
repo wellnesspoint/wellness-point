@@ -95,6 +95,7 @@ export default function CheckoutPage() {
 
   const [processing, setProcessing] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [shippingSettings, setShippingSettings] = useState({
     flatRate: 99,
     freeShippingThreshold: 999,
@@ -195,40 +196,23 @@ export default function CheckoutPage() {
   }, [session, updateAddress]);
 
   const validateAddress = () => {
-    if (
-      !address.fullName ||
-      !address.email ||
-      !address.phone ||
-      !address.street ||
-      !address.city ||
-      !address.state ||
-      !address.pincode
-    ) {
-      toast.error("Please fill in all address fields");
-      return false;
-    }
-    if (!/^[a-zA-Z\s]+$/.test(address.fullName)) {
-      toast.error("Full name must contain only alphabets");
-      return false;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) {
-      toast.error("Please enter a valid email address");
-      return false;
-    }
-    if (!/^\d{10}$/.test(address.phone)) {
-      toast.error("Phone number must be exactly 10 digits");
-      return false;
-    }
-    if (!/^[a-zA-Z\s]+$/.test(address.city)) {
-      toast.error("City must contain only alphabets");
-      return false;
-    }
-    if (!/^[a-zA-Z\s]+$/.test(address.state)) {
-      toast.error("State must contain only alphabets");
-      return false;
-    }
-    if (!/^\d{6}$/.test(address.pincode)) {
-      toast.error("Pincode must be exactly 6 digits");
+    const errors: Record<string, string> = {};
+    if (!address.fullName) errors.fullName = "Full name is required";
+    else if (!/^[a-zA-Z\s]+$/.test(address.fullName)) errors.fullName = "Only letters and spaces";
+    if (!address.email) errors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) errors.email = "Invalid email address";
+    if (!address.phone) errors.phone = "Phone is required";
+    else if (!/^\d{10}$/.test(address.phone)) errors.phone = "Must be 10 digits";
+    if (!address.street) errors.street = "Address is required";
+    if (!address.city) errors.city = "City is required";
+    else if (!/^[a-zA-Z\s]+$/.test(address.city)) errors.city = "Only letters";
+    if (!address.state) errors.state = "State is required";
+    else if (!/^[a-zA-Z\s]+$/.test(address.state)) errors.state = "Only letters";
+    if (!address.pincode) errors.pincode = "Pincode is required";
+    else if (!/^\d{6}$/.test(address.pincode)) errors.pincode = "Must be 6 digits";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error("Please fix the highlighted fields");
       return false;
     }
     return true;
@@ -333,7 +317,7 @@ export default function CheckoutPage() {
               clearCart();
               try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
               toast.success("Order placed successfully!");
-              router.push("/dashboard/orders");
+              router.push(`/order-confirmation?orderId=${verifyData.order._id}`);
             } else {
               toast.error("Payment verification failed");
             }
@@ -428,20 +412,26 @@ export default function CheckoutPage() {
                     onChange={(e) => {
                       const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
                       updateAddress({ ...address, fullName: val });
+                      setFieldErrors((prev) => ({ ...prev, fullName: "" }));
                     }}
                     placeholder="Enter your full name"
+                    className={fieldErrors.fullName ? "border-red-500" : ""}
                   />
+                  {fieldErrors.fullName && <p className="text-xs text-red-500 mt-1">{fieldErrors.fullName}</p>}
                 </div>
                 <div>
                   <Label>Email ID</Label>
                   <Input
                     type="email"
                     value={address.email}
-                    onChange={(e) =>
-                      updateAddress({ ...address, email: e.target.value })
-                    }
+                    onChange={(e) => {
+                      updateAddress({ ...address, email: e.target.value });
+                      setFieldErrors((prev) => ({ ...prev, email: "" }));
+                    }}
                     placeholder="Enter your email address"
+                    className={fieldErrors.email ? "border-red-500" : ""}
                   />
+                  {fieldErrors.email && <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p>}
                 </div>
                 <div>
                   <Label>Phone Number</Label>
@@ -450,21 +440,27 @@ export default function CheckoutPage() {
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "").slice(0, 10);
                       updateAddress({ ...address, phone: val });
+                      setFieldErrors((prev) => ({ ...prev, phone: "" }));
                     }}
                     maxLength={10}
                     inputMode="numeric"
                     placeholder="Enter your phone number"
+                    className={fieldErrors.phone ? "border-red-500" : ""}
                   />
+                  {fieldErrors.phone && <p className="text-xs text-red-500 mt-1">{fieldErrors.phone}</p>}
                 </div>
                 <div className="sm:col-span-2">
                   <Label>Address Line 1</Label>
                   <Input
                     value={address.street}
-                    onChange={(e) =>
-                      updateAddress({ ...address, street: e.target.value })
-                    }
+                    onChange={(e) => {
+                      updateAddress({ ...address, street: e.target.value });
+                      setFieldErrors((prev) => ({ ...prev, street: "" }));
+                    }}
                     placeholder="Enter your address"
+                    className={fieldErrors.street ? "border-red-500" : ""}
                   />
+                  {fieldErrors.street && <p className="text-xs text-red-500 mt-1">{fieldErrors.street}</p>}
                 </div>
                 <div className="sm:col-span-2">
                   <Label>Address Line 2 <span className="text-xs text-muted-foreground">(Optional)</span></Label>
@@ -483,9 +479,12 @@ export default function CheckoutPage() {
                     onChange={(e) => {
                       const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
                       updateAddress({ ...address, city: val });
+                      setFieldErrors((prev) => ({ ...prev, city: "" }));
                     }}
                     placeholder="Enter your city"
+                    className={fieldErrors.city ? "border-red-500" : ""}
                   />
+                  {fieldErrors.city && <p className="text-xs text-red-500 mt-1">{fieldErrors.city}</p>}
                 </div>
                 <div>
                   <Label>State</Label>
@@ -494,9 +493,12 @@ export default function CheckoutPage() {
                     onChange={(e) => {
                       const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
                       updateAddress({ ...address, state: val });
+                      setFieldErrors((prev) => ({ ...prev, state: "" }));
                     }}
                     placeholder="Enter your state"
+                    className={fieldErrors.state ? "border-red-500" : ""}
                   />
+                  {fieldErrors.state && <p className="text-xs text-red-500 mt-1">{fieldErrors.state}</p>}
                 </div>
                 <div>
                   <Label>Pincode</Label>
@@ -505,11 +507,14 @@ export default function CheckoutPage() {
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "").slice(0, 6);
                       updateAddress({ ...address, pincode: val });
+                      setFieldErrors((prev) => ({ ...prev, pincode: "" }));
                     }}
                     placeholder="Enter your pincode"
                     maxLength={6}
                     inputMode="numeric"
+                    className={fieldErrors.pincode ? "border-red-500" : ""}
                   />
+                  {fieldErrors.pincode && <p className="text-xs text-red-500 mt-1">{fieldErrors.pincode}</p>}
                 </div>
 
                 {/* Save address checkbox — shown when user edits an existing saved address */}

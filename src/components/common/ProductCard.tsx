@@ -122,9 +122,16 @@ function ProductCard({ product, isWishlisted = false, onWishlistChange }: Produc
             src={product.images[0]}
             alt={product.name}
             fill
-            className="object-contain p-6 transition-transform duration-500 group-hover:scale-110"
+            className={`object-contain p-6 transition-transform duration-500 group-hover:scale-110 ${product.stock === 0 ? "opacity-50 grayscale" : ""}`}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           />
+          {product.stock === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+              <span className="rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">
+                Sold Out
+              </span>
+            </div>
+          )}
         </div>
       </Link>
 

@@ -1,15 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+// ── In-memory rate limiter for login attempts ──
+const loginAttempts = new Map<string, { count: number; resetTime: number }>();
+
+function checkLoginRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+
+  if (!entry || now > entry.resetTime) {
+    loginAttempts.set(ip, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+
+  entry.count++;
+  return entry.count <= 10; // 10 attempts per 15 minutes
+}
+
+// Cleanup stale entries periodically
+if (typeof setInterval !== "undefined") {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of loginAttempts.entries()) {
+      if (now > entry.resetTime) loginAttempts.delete(key);
+    }
+  }, 5 * 60 * 1000);
+}
+
 /**
- * Centralized middleware for route protection.
+ * Centralized proxy for route protection + login rate limiting.
  *
+ * - /api/auth/callback/credentials → rate limit login attempts
  * - /dashboard/* → requires authenticated user session (NextAuth JWT)
  * - /admin/* → requires admin-token cookie (except /admin/login)
  * - /api/admin/* → requires admin-token cookie (except /api/admin/auth/*)
  */
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // ─── Rate limit login attempts ────────────────────────────────────
+  if (pathname === "/api/auth/callback/credentials") {
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+
+    if (!checkLoginRateLimit(ip)) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+  }
 
   // ─── Dashboard routes: require user authentication ───────────────
   if (pathname.startsWith("/dashboard")) {
@@ -70,5 +112,6 @@ export const config = {
     "/api/orders/:path*",
     "/api/wishlist/:path*",
     "/api/user/:path*",
+    "/api/auth/callback/credentials",
   ],
 };

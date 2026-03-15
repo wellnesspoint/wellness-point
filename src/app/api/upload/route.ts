@@ -1,15 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import cloudinary from "@/lib/cloudinary";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+
+const ALLOWED_FOLDERS = ["products", "blogs", "testimonials"];
 
 export async function POST(req: NextRequest) {
   try {
     const session = await checkAdmin();
     if (!session) return unauthorizedResponse();
 
+    // Rate limit: 20 uploads per 15 minutes
+    const ip = getClientIp(req);
+    const { success: withinLimit } = rateLimit(`upload:${ip}`, {
+      limit: 20,
+      windowMs: 15 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "Too many uploads. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const formData = await req.formData();
     const files = formData.getAll("files") as File[];
-    const folder = (formData.get("folder") as string) || "products";
+    const rawFolder = (formData.get("folder") as string) || "products";
+    const folder = ALLOWED_FOLDERS.includes(rawFolder) ? rawFolder : "products";
 
     if (!files || files.length === 0) {
       return NextResponse.json(

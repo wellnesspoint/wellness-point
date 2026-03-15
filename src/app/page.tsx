@@ -8,6 +8,9 @@ import connectDB from "@/lib/db";
 import Product from "@/models/Product";
 import Testimonial from "@/models/Testimonial";
 
+// ISR: regenerate homepage every 5 minutes
+export const revalidate = 300;
+
 export default async function HomePage() {
   await connectDB();
 

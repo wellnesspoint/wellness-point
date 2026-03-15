@@ -4,6 +4,7 @@ import Review from "@/models/Review";
 import Product from "@/models/Product";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // GET /api/reviews?productId=xxx — get approved reviews for a product
 export async function GET(req: NextRequest) {
@@ -44,6 +45,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "You must be logged in to submit a review" },
         { status: 401 }
+      );
+    }
+
+    // Rate limit: 5 reviews per 15 minutes per IP
+    const ip = getClientIp(req);
+    const { success: withinLimit } = rateLimit(`review:${ip}`, {
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "Too many review submissions. Please try again later." },
+        { status: 429 }
       );
     }
 

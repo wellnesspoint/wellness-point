@@ -4,6 +4,9 @@ import connectDB from "@/lib/db";
 import Product from "@/models/Product";
 import ShopGrid from "./ShopGrid";
 
+// ISR: regenerate shop page every 5 minutes
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: "Shop",
   description:
