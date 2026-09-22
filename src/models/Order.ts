@@ -11,11 +11,12 @@ export interface IOrderItem {
 export interface IOrder extends Document {
   user: mongoose.Types.ObjectId;
   items: IOrderItem[];
-  shippingAddress: {
+  shippingAddress?: {
     fullName: string;
     email?: string;
     phone: string;
     street: string;
+    addressLine2?: string;
     city: string;
     state: string;
     pincode: string;
@@ -29,6 +30,7 @@ export interface IOrder extends Document {
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   razorpaySignature?: string;
+  stockRestored?: boolean;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -46,14 +48,17 @@ const orderSchema = new Schema<IOrder>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     items: [orderItemSchema],
+    // Not required at the schema level: an order is created (paymentStatus "pending")
+    // before the shipping address is known — it's filled in once payment is verified.
     shippingAddress: {
-      fullName: { type: String, required: true },
+      fullName: { type: String },
       email: { type: String },
-      phone: { type: String, required: true },
-      street: { type: String, required: true },
-      city: { type: String, required: true },
-      state: { type: String, required: true },
-      pincode: { type: String, required: true },
+      phone: { type: String },
+      street: { type: String },
+      addressLine2: { type: String },
+      city: { type: String },
+      state: { type: String },
+      pincode: { type: String },
     },
     subtotal: { type: Number, required: true },
     shipping: { type: Number, required: true, default: 0 },
@@ -69,9 +74,15 @@ const orderSchema = new Schema<IOrder>(
       enum: ["processing", "confirmed", "shipped", "delivered", "cancelled"],
       default: "processing",
     },
-    razorpayOrderId: { type: String },
+    // Unique + sparse: every order created via /api/payment/create-order gets one,
+    // and uniqueness is what prevents a single Razorpay payment from being
+    // "verified" more than once to mint duplicate orders / double-decrement stock.
+    razorpayOrderId: { type: String, unique: true, sparse: true },
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
+    // Set once stock has been returned to inventory for a cancelled/refunded order,
+    // so admin re-saves (or repeated status transitions) never double-restore it.
+    stockRestored: { type: Boolean, default: false },
     notes: { type: String },
   },
   {
@@ -80,7 +91,6 @@ const orderSchema = new Schema<IOrder>(
 );
 
 orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ razorpayOrderId: 1 });
 
 const Order: Model<IOrder> =
   mongoose.models.Order || mongoose.model<IOrder>("Order", orderSchema);

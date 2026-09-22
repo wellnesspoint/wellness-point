@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
+import { FALLBACK_IMAGE } from "@/lib/constants";
 
 interface OrderItem {
   product: string;
@@ -27,6 +28,7 @@ interface Order {
   shippingAddress: {
     fullName: string;
     street: string;
+    addressLine2?: string;
     city: string;
     state: string;
     pincode: string;
@@ -161,6 +163,10 @@ export default function OrdersPage() {
                             src={item.image}
                             alt={item.name}
                             className="h-12 w-12 rounded-lg object-cover"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = FALLBACK_IMAGE;
+                            }}
                           />
                         )}
                         <div className="flex-1">
@@ -210,7 +216,8 @@ export default function OrdersPage() {
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {order.shippingAddress.fullName},{" "}
-                        {order.shippingAddress.street},{" "}
+                        {order.shippingAddress.street}
+                        {order.shippingAddress.addressLine2 && `, ${order.shippingAddress.addressLine2}`},{" "}
                         {order.shippingAddress.city},{" "}
                         {order.shippingAddress.state} –{" "}
                         {order.shippingAddress.pincode}

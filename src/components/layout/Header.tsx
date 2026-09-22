@@ -27,6 +27,15 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
   const cartItemCount = useCartStore((s) => s.getItemCount());
   const openCart = useCartStore((s) => s.openCart);
+  const clearCart = useCartStore((s) => s.clearCart);
+
+  const handleSignOut = () => {
+    // Cart is a single global localStorage key, not scoped per user — clear
+    // it on sign-out so the next person to log in on a shared device doesn't
+    // see (or check out with) the previous user's cart.
+    clearCart();
+    signOut();
+  };
 
 
 
@@ -133,7 +142,7 @@ export default function Header() {
                     <button
                       onClick={() => {
                         setUserMenuOpen(false);
-                        signOut();
+                        handleSignOut();
                       }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10"
                     >

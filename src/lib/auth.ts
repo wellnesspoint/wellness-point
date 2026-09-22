@@ -71,7 +71,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "facebook") {
         await connectDB();
 
@@ -82,6 +82,21 @@ export const authOptions: NextAuthOptions = {
           if (!existingUser.isActive) {
             return false;
           }
+
+          // Don't silently take over an account that signed up a different
+          // way (e.g. email/password) just because this OAuth provider
+          // *claims* the same email — that would be an account-takeover path
+          // if the provider ever hands back an unverified/attacker-supplied
+          // email. Google's profile reliably asserts `email_verified`;
+          // Facebook's does not, so we never auto-link via Facebook.
+          if (existingUser.provider !== account.provider) {
+            const emailVerifiedByProvider =
+              account.provider === "google" && (profile as any)?.email_verified === true;
+            if (!emailVerifiedByProvider) {
+              return "/login?error=oauth-email-exists";
+            }
+          }
+
           // Auto-verify email for OAuth users
           if (!existingUser.emailVerified) {
             existingUser.emailVerified = true;

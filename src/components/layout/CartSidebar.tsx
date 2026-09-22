@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { X, Plus, Minus, ShoppingBag, ArrowRight } from "lucide-react";
@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { useCartStore, CartItem } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { FALLBACK_IMAGE } from "@/lib/constants";
 
 export default function CartSidebar() {
   const { items, isOpen, closeCart, removeItem, updateQuantity, getSubtotal } =
@@ -138,16 +139,19 @@ function CartItemCard({
   onUpdateQuantity: (qty: number) => void;
 }) {
   const effectivePrice = item.discountPrice || item.price;
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div className="flex gap-3 rounded-xl border border-border p-3">
       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
         <Image
-          src={item.image}
+          src={imgError || !item.image ? FALLBACK_IMAGE : item.image}
           alt={item.name}
           fill
+          unoptimized={imgError || !item.image}
           className="object-cover"
           sizes="80px"
+          onError={() => setImgError(true)}
         />
       </div>
       <div className="flex flex-1 flex-col justify-between">

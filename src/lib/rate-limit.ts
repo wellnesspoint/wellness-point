@@ -91,11 +91,28 @@ export function rateLimit(
   };
 }
 
-/** Helper to extract client IP from request */
+/**
+ * Helper to extract client IP from request.
+ *
+ * IMPORTANT: never trust the FIRST entry of X-Forwarded-For — a client can
+ * send their own XFF header, and if the platform proxy appends (rather than
+ * replaces) it, `split(",")[0]` returns attacker-controlled text, letting
+ * anyone bypass rate limiting by sending a different fake value per request.
+ *
+ * On Vercel, `x-vercel-forwarded-for` is set by Vercel's edge network itself
+ * and cannot be spoofed by the client, so it's preferred when present. As a
+ * fallback, we take the LAST entry of X-Forwarded-For — the hop closest to
+ * our server, which the proxy chain appends and a client can't overwrite.
+ */
 export function getClientIp(req: Request): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  const vercelIp = req.headers.get("x-vercel-forwarded-for");
+  if (vercelIp) return vercelIp.split(",")[0].trim();
+
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+
+  return req.headers.get("x-real-ip") || "unknown";
 }

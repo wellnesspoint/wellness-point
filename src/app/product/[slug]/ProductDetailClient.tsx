@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useCartStore } from "@/store/cart";
 import { formatPrice, getDiscountPercentage } from "@/lib/utils";
+import { FALLBACK_IMAGE } from "@/lib/constants";
 import toast from "react-hot-toast";
 
 interface ProductDetailClientProps {
@@ -51,6 +52,10 @@ export default function ProductDetailClient({
 }: ProductDetailClientProps) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  // Tracks which image indices failed to load (e.g. a dead hotlinked URL) so
+  // they can fall back to a placeholder instead of a broken-image icon.
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
+  const markFailed = (i: number) => setFailedImages((prev) => ({ ...prev, [i]: true }));
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
   const router = useRouter();
@@ -164,12 +169,18 @@ export default function ProductDetailClient({
                 </Badge>
               )}
               <Image
-                src={product.images[selectedImage] || "/images/placeholder.jpg"}
+                src={
+                  failedImages[selectedImage] || !product.images[selectedImage]
+                    ? FALLBACK_IMAGE
+                    : product.images[selectedImage]
+                }
                 alt={product.name}
                 fill
+                unoptimized={failedImages[selectedImage] || !product.images[selectedImage]}
                 className="object-contain p-8"
                 sizes="(max-width: 768px) 100vw, 50vw"
                 priority
+                onError={() => markFailed(selectedImage)}
               />
             </div>
             {/* Thumbnails */}
@@ -185,11 +196,13 @@ export default function ProductDetailClient({
                       }`}
                   >
                     <Image
-                      src={img}
+                      src={failedImages[i] || !img ? FALLBACK_IMAGE : img}
                       alt={`${product.name} - view ${i + 1}`}
                       fill
+                      unoptimized={failedImages[i] || !img}
                       className="object-contain p-2"
                       sizes="80px"
+                      onError={() => markFailed(i)}
                     />
                   </button>
                 ))}

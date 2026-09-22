@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import cloudinary from "@/lib/cloudinary";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { isLikelyImageFile } from "@/lib/utils";
 
 const ALLOWED_FOLDERS = ["products", "blogs", "testimonials"];
 
@@ -63,6 +64,16 @@ export async function POST(req: NextRequest) {
 
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
+
+      // The `image/...` check above only looked at a client-supplied form
+      // field — trivially spoofable. Confirm the file's actual bytes match
+      // a real image format before handing it to Cloudinary.
+      if (!isLikelyImageFile(buffer)) {
+        return NextResponse.json(
+          { error: `${file.name} is not a valid image file` },
+          { status: 400 }
+        );
+      }
 
       // Upload to Cloudinary
       const result = await new Promise<{ secure_url: string }>(

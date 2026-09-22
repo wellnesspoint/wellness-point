@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Heart, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FALLBACK_IMAGE } from "@/lib/constants";
 import { useCartStore } from "@/store/cart";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -117,9 +118,13 @@ export default function WishlistPage() {
                 <Link href={`/product/${product.slug}`}>
                   <div className="relative aspect-square bg-muted">
                     <img
-                      src={product.images?.[0] || "/placeholder.jpg"}
+                      src={product.images?.[0] || FALLBACK_IMAGE}
                       alt={product.name}
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = FALLBACK_IMAGE;
+                      }}
                     />
                     {hasDiscount && (
                       <span className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">

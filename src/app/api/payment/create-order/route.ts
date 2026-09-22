@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import razorpay from "@/lib/razorpay";
 import connectDB from "@/lib/db";
 import Product from "@/models/Product";
+import Order from "@/models/Order";
 import ShippingSettings from "@/models/ShippingSettings";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -13,6 +14,13 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
  * Accepts cart items from the client, looks up real prices & stock from DB,
  * calculates totals server-side, and creates a Razorpay order.
  * This prevents price manipulation — the client never controls the amount.
+ *
+ * A matching "pending" Order is also created here, storing the server-computed
+ * items/total keyed by the Razorpay order id. /api/payment/verify later trusts
+ * ONLY this stored total (cross-checked against what Razorpay actually captured)
+ * instead of re-trusting whatever items the client sends back at verify time —
+ * closing the gap where a client could pay for a cheap order but "verify" an
+ * expensive one using the same signature.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -45,14 +53,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Merge duplicate product ids (a direct API call could send the same
+    // product twice — the cart UI itself always merges these already).
+    const qtyByProduct = new Map<string, number>();
+    for (const item of items) {
+      const id = String(item._id);
+      const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+      qtyByProduct.set(id, (qtyByProduct.get(id) || 0) + qty);
+    }
+    const productIds = Array.from(qtyByProduct.keys());
+
     // Look up all products from DB to get real prices and stock
-    const productIds = items.map((item: any) => item._id);
     const products = await Product.find({
       _id: { $in: productIds },
       isActive: true,
     }).lean();
 
-    if (products.length !== items.length) {
+    if (products.length !== productIds.length) {
       return NextResponse.json(
         { error: "Some products are no longer available" },
         { status: 400 }
@@ -68,16 +85,16 @@ export async function POST(req: NextRequest) {
     const validatedItems = [];
     let subtotal = 0;
 
-    for (const item of items) {
-      const product = productMap.get(item._id);
+    for (const id of productIds) {
+      const product = productMap.get(id);
       if (!product) {
         return NextResponse.json(
-          { error: `Product not found: ${item._id}` },
+          { error: `Product not found: ${id}` },
           { status: 400 }
         );
       }
 
-      const requestedQty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+      const requestedQty = qtyByProduct.get(id)!;
 
       if (product.stock < requestedQty) {
         return NextResponse.json(
@@ -134,6 +151,21 @@ export async function POST(req: NextRequest) {
     };
 
     const order = await razorpay.orders.create(options);
+
+    // Lock in the server-computed items/total against this Razorpay order id.
+    // /api/payment/verify will only ever trust THIS record — never client-resent
+    // cart data — when finalizing the order after payment.
+    await Order.create({
+      user: (session.user as any).id,
+      items: validatedItems,
+      subtotal,
+      shipping,
+      discount: 0,
+      total,
+      paymentStatus: "pending",
+      orderStatus: "processing",
+      razorpayOrderId: order.id,
+    });
 
     return NextResponse.json({
       orderId: order.id,

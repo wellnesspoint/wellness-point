@@ -36,7 +36,13 @@ export async function GET() {
       todayOrders,
       lowStockProducts,
     ] = await Promise.all([
-      Order.find({}).populate("user", "name email").sort({ createdAt: -1 }).lean(),
+      // Exclude "pending" — those are checkout attempts that never completed
+      // payment (created up-front by /api/payment/create-order so a total
+      // can be locked in before the Razorpay redirect), not real orders.
+      Order.find({ paymentStatus: { $ne: "pending" } })
+        .populate("user", "name email")
+        .sort({ createdAt: -1 })
+        .lean(),
       Product.countDocuments({ isActive: true }),
       User.countDocuments({ role: "user" }),
       mongoose.connection.db!.collection("newslettersubscribers").countDocuments({ isActive: true }),

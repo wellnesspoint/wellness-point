@@ -20,9 +20,12 @@ export async function GET() {
       select: "name slug price discountPrice images shortDescription rating reviewCount stock",
     }).lean();
 
-    return NextResponse.json({
-      products: wishlist?.products || [],
-    });
+    // A referenced product may have since been deleted — populate() leaves a
+    // null in its place rather than dropping it, which would otherwise crash
+    // the wishlist page when it maps over the array.
+    const products = (wishlist?.products || []).filter(Boolean);
+
+    return NextResponse.json({ products });
   } catch (error) {
     console.error("Wishlist fetch error:", error);
     return NextResponse.json(

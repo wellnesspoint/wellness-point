@@ -14,6 +14,7 @@ export interface IUser extends Document {
     fullName: string;
     phone: string;
     street: string;
+    addressLine2?: string;
     city: string;
     state: string;
     pincode: string;
@@ -37,6 +38,7 @@ const addressSchema = new Schema(
     fullName: { type: String, required: true },
     phone: { type: String, required: true },
     street: { type: String, required: true },
+    addressLine2: { type: String },
     city: { type: String, required: true },
     state: { type: String, required: true },
     pincode: { type: String, required: true },

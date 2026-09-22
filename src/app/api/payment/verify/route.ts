@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { verifyRazorpaySignature } from "@/lib/razorpay";
+import razorpay, { verifyRazorpaySignature } from "@/lib/razorpay";
 import connectDB from "@/lib/db";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
-import ShippingSettings from "@/models/ShippingSettings";
 import { sendOrderConfirmation } from "@/lib/email";
+import { validateShippingAddress } from "@/lib/utils";
 
 /**
  * POST /api/payment/verify
  *
- * Verifies Razorpay payment signature, re-validates prices/stock from DB,
- * decrements stock atomically, and creates the order.
+ * Verifies a Razorpay payment and finalizes the matching "pending" Order that
+ * was created (with a server-computed total) by /api/payment/create-order.
+ *
+ * Security model:
+ * 1. The HMAC signature proves Razorpay issued this payment_id for this order_id.
+ * 2. We then fetch the actual payment from Razorpay's API and confirm it was
+ *    captured for the SAME amount as the total we locked in at create-order —
+ *    the client's `orderData` is never trusted for pricing, only for the
+ *    shipping address. This is what stops a user from paying for a cheap
+ *    order and then "verifying" an expensive one with that signature.
+ * 3. The pending Order is looked up by its unique razorpayOrderId, so this
+ *    endpoint can't be replayed to mint multiple paid orders (or decrement
+ *    stock more than once) from a single payment.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +41,13 @@ export async function POST(req: NextRequest) {
       orderData,
     } = await req.json();
 
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return NextResponse.json(
+        { error: "Missing payment details" },
+        { status: 400 }
+      );
+    }
+
     // 1. Verify Razorpay signature
     const isValid = verifyRazorpaySignature(
       razorpay_order_id,
@@ -44,154 +62,142 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Re-validate items from DB (never trust client data for totals)
-    if (!orderData?.items?.length) {
-      return NextResponse.json(
-        { error: "Order items are required" },
-        { status: 400 }
-      );
-    }
-
-    const productIds = orderData.items.map((item: any) => item.product);
-    const products = await Product.find({
-      _id: { $in: productIds },
-      isActive: true,
+    // 2. Find the pending order created at /api/payment/create-order time.
+    // Its items/subtotal/shipping/total are the ONLY source of truth from here on.
+    const order = await Order.findOne({
+      razorpayOrderId: razorpay_order_id,
+      user: (session.user as any).id,
     });
 
-    if (products.length !== orderData.items.length) {
+    if (!order) {
       return NextResponse.json(
-        { error: "Some products are no longer available" },
+        { error: "Order not found. Please start checkout again." },
         { status: 400 }
       );
     }
 
-    const productMap = new Map(
-      products.map((p) => [p._id.toString(), p])
-    );
-
-    // 3. Build verified items, check stock, and calculate totals server-side
-    const verifiedItems = [];
-    let subtotal = 0;
-
-    for (const item of orderData.items) {
-      const product = productMap.get(item.product);
-      if (!product) {
-        return NextResponse.json(
-          { error: `Product not found: ${item.product}` },
-          { status: 400 }
-        );
-      }
-
-      const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
-
-      if (product.stock < qty) {
-        return NextResponse.json(
-          {
-            error: `Insufficient stock for "${product.name}". Available: ${product.stock}`,
-          },
-          { status: 400 }
-        );
-      }
-
-      const unitPrice = product.discountPrice ?? product.price;
-      subtotal += unitPrice * qty;
-
-      verifiedItems.push({
-        product: product._id,
-        name: product.name,
-        image: product.images?.[0] || "",
-        price: unitPrice,
-        quantity: qty,
-      });
+    // Idempotent replay: already finalized — return success without redoing
+    // stock decrement / email side effects.
+    if (order.paymentStatus === "paid") {
+      return NextResponse.json({ success: true, order: { _id: order._id } });
     }
 
-    // Use admin shipping settings instead of hardcoded values
-    let shippingCost = 50; // fallback
+    if (order.paymentStatus !== "pending") {
+      return NextResponse.json(
+        {
+          error:
+            "This order could not be completed automatically. Our team has been notified — please contact support with your payment ID.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // 3. Cross-check the amount Razorpay actually captured against our
+    // server-computed total — this is what makes tampering impossible.
+    let payment;
     try {
-      const shippingConfig = await ShippingSettings.findOne().lean() as { enableFreeShipping?: boolean; freeShippingThreshold?: number; flatRate?: number } | null;
-      if (shippingConfig) {
-        if (shippingConfig.enableFreeShipping && subtotal >= (shippingConfig.freeShippingThreshold ?? 999)) {
-          shippingCost = 0;
-        } else {
-          shippingCost = shippingConfig.flatRate ?? 50;
-        }
-      } else {
-        // No settings configured — use legacy logic
-        shippingCost = subtotal >= 999 ? 0 : 99;
-      }
-    } catch {
-      shippingCost = subtotal >= 999 ? 0 : 99;
+      payment = await razorpay.payments.fetch(razorpay_payment_id);
+    } catch (err) {
+      console.error("Failed to fetch Razorpay payment:", err);
+      return NextResponse.json(
+        { error: "Could not confirm payment with Razorpay. Please try again." },
+        { status: 502 }
+      );
     }
-    const total = Math.round((subtotal + shippingCost) * 100) / 100;
 
-    // 4. Decrement stock atomically for each product
-    for (const item of verifiedItems) {
+    const expectedAmountPaise = Math.round(order.total * 100);
+    if (
+      payment.order_id !== razorpay_order_id ||
+      payment.status !== "captured" ||
+      Number(payment.amount) !== expectedAmountPaise
+    ) {
+      console.error("Payment amount/status mismatch", {
+        orderId: order._id.toString(),
+        expectedAmountPaise,
+        payment,
+      });
+      return NextResponse.json(
+        { error: "Payment could not be verified" },
+        { status: 400 }
+      );
+    }
+
+    // 4. Validate & sanitize the shipping address server-side — the client
+    // regex on the checkout form is UX only, not a security boundary.
+    const validated = validateShippingAddress(orderData?.shippingAddress || {});
+    if (!validated.valid) {
+      return NextResponse.json({ error: validated.error }, { status: 400 });
+    }
+
+    // 5. Re-check stock (it may have moved since create-order) and decrement
+    // atomically, rolling back any already-decremented items on failure.
+    const decremented: { product: any; quantity: number }[] = [];
+    let stockError: string | null = null;
+
+    for (const item of order.items) {
       const result = await Product.findOneAndUpdate(
-        {
-          _id: item.product,
-          stock: { $gte: item.quantity }, // Only decrement if enough stock
-        },
-        {
-          $inc: { stock: -item.quantity },
-        },
+        { _id: item.product, stock: { $gte: item.quantity } },
+        { $inc: { stock: -item.quantity } },
         { new: true }
       );
 
       if (!result) {
-        // Stock was taken by another order between check and decrement.
-        // Rollback any already-decremented products.
-        const currentIndex = verifiedItems.indexOf(item);
-        for (let i = 0; i < currentIndex; i++) {
-          await Product.findByIdAndUpdate(verifiedItems[i].product, {
-            $inc: { stock: verifiedItems[i].quantity },
-          });
-        }
-        return NextResponse.json(
-          {
-            error: `"${item.name}" is no longer available in the requested quantity. Please try again.`,
-          },
-          { status: 409 }
-        );
+        stockError = `"${item.name}" is no longer available in the requested quantity.`;
+        break;
       }
+      decremented.push({ product: item.product, quantity: item.quantity });
     }
 
-    // 5. Create order in DB with server-calculated totals
-    const order = await Order.create({
-      user: (session.user as any).id,
-      items: verifiedItems,
-      shippingAddress: orderData.shippingAddress,
-      subtotal,
-      shipping: shippingCost,
-      discount: 0,
-      total,
-      paymentStatus: "paid",
-      orderStatus: "processing",
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      razorpaySignature: razorpay_signature,
-    });
+    if (stockError) {
+      // Roll back whatever we did manage to decrement.
+      for (const d of decremented) {
+        await Product.findByIdAndUpdate(d.product, { $inc: { stock: d.quantity } });
+      }
 
-    // 6. Send order confirmation email (MUST await — Vercel kills the function after response)
-    // Use the email from the checkout form (shippingAddress.email), not the account email
-    const recipientEmail = orderData.shippingAddress?.email || session.user?.email || "";
+      // The payment WAS captured by Razorpay — don't lose track of it.
+      // Mark the order failed (visible to admins for manual refund) instead
+      // of silently discarding a paid-for order.
+      order.paymentStatus = "failed";
+      order.razorpayPaymentId = razorpay_payment_id;
+      order.razorpaySignature = razorpay_signature;
+      order.notes = `Payment captured (${razorpay_payment_id}) but stock became unavailable: ${stockError} Requires manual refund.`;
+      await order.save();
+
+      return NextResponse.json(
+        {
+          error: `${stockError} Your payment was received — our team will contact you to refund it.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    // 6. Finalize the order with the server-validated shipping address.
+    order.shippingAddress = validated.address;
+    order.paymentStatus = "paid";
+    order.orderStatus = "processing";
+    order.razorpayPaymentId = razorpay_payment_id;
+    order.razorpaySignature = razorpay_signature;
+    await order.save();
+
+    // 7. Send order confirmation email (MUST await — Vercel kills the function after response)
     try {
       await sendOrderConfirmation({
-        customerName: orderData.shippingAddress?.fullName || session.user?.name || "Customer",
-        customerEmail: recipientEmail,
+        customerName: validated.address.fullName || session.user?.name || "Customer",
+        customerEmail: validated.address.email || session.user?.email || "",
         orderId: order._id.toString(),
-        items: verifiedItems.map((item) => ({
+        items: order.items.map((item) => ({
           name: item.name,
           quantity: item.quantity,
           price: item.price,
         })),
-        subtotal,
-        shipping: shippingCost,
-        total,
-        shippingAddress: orderData.shippingAddress,
-        discount: 0,
+        subtotal: order.subtotal,
+        shipping: order.shipping,
+        total: order.total,
+        shippingAddress: validated.address,
+        discount: order.discount,
         createdAt: order.createdAt,
       });
-      console.log("Order confirmation email sent to:", recipientEmail);
+      console.log("Order confirmation email sent to:", validated.address.email);
     } catch (emailErr) {
       console.error("Order confirmation email failed:", emailErr);
       // Don't fail the order — email is best-effort

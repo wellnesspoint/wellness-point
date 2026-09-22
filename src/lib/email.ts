@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { generateInvoicePDF, InvoiceOrderData } from "./invoice";
+import { escapeHtml } from "./utils";
 
 /**
  * Email service for Wellness Point.
@@ -75,6 +76,7 @@ interface OrderEmailData {
     fullName: string;
     phone?: string;
     street?: string;
+    addressLine2?: string;
     city?: string;
     state?: string;
     pincode?: string;
@@ -98,7 +100,7 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
     .map(
       (item) =>
         `<tr>
-          <td style="padding:8px;border-bottom:1px solid #e5e7eb">${item.name}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb">${escapeHtml(item.name)}</td>
           <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${item.quantity}</td>
           <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">₹${item.price.toFixed(2)}</td>
         </tr>`
@@ -112,7 +114,7 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
       </div>
       <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
         <h2 style="color:#065f46">Order Confirmed! 🎉</h2>
-        <p>Hi <strong>${data.customerName}</strong>,</p>
+        <p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
         <p>Thank you for your order. Here's your order summary:</p>
         <p style="color:#6b7280;font-size:14px">Order ID: <strong>${formatOrderId(data.orderId)}</strong></p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0">
@@ -206,15 +208,15 @@ export async function sendContactReply(data: ContactReplyData) {
       </div>
       <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
         <h2 style="color:#065f46">We've replied to your query</h2>
-        <p>Hi <strong>${data.customerName}</strong>,</p>
+        <p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
         <p>Thank you for reaching out. Here's our response to your inquiry:</p>
         <div style="background:#fff;border-left:4px solid #065f46;padding:16px;margin:16px 0;border-radius:4px">
-          <p style="color:#6b7280;font-size:13px;margin:0 0 8px">Your message about "<em>${data.originalSubject}</em>":</p>
-          <p style="color:#374151;margin:0;white-space:pre-wrap">${data.originalMessage.replace(/\n/g, "<br />")}</p>
+          <p style="color:#6b7280;font-size:13px;margin:0 0 8px">Your message about "<em>${escapeHtml(data.originalSubject)}</em>":</p>
+          <p style="color:#374151;margin:0;white-space:pre-wrap">${escapeHtml(data.originalMessage).replace(/\n/g, "<br />")}</p>
         </div>
         <div style="background:#ecfdf5;padding:16px;margin:16px 0;border-radius:8px">
           <p style="color:#065f46;font-weight:600;margin:0 0 8px">Our Reply:</p>
-          <p style="color:#374151;margin:0;white-space:pre-wrap">${data.adminReply.replace(/\n/g, "<br />")}</p>
+          <p style="color:#374151;margin:0;white-space:pre-wrap">${escapeHtml(data.adminReply).replace(/\n/g, "<br />")}</p>
         </div>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
         <p style="color:#6b7280;font-size:13px">
@@ -258,7 +260,7 @@ export async function sendPasswordResetEmail(data: PasswordResetData) {
       </div>
       <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
         <h2 style="color:#065f46">Reset Your Password</h2>
-        <p>Hi <strong>${data.customerName}</strong>,</p>
+        <p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
         <p>We received a request to reset your password. Click the button below to create a new password:</p>
         <div style="text-align:center;margin:24px 0">
           <a href="${data.resetUrl}" style="display:inline-block;background:#065f46;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600">
@@ -286,6 +288,53 @@ export async function sendPasswordResetEmail(data: PasswordResetData) {
   });
 }
 
+// ─── OAuth Account Notice ──────────────────────────────────────────
+// Sent instead of a reset link when a password-reset request comes in for
+// an email that's only registered via Google/Facebook sign-in. Keeping this
+// server-side (rather than telling the API caller directly) means the
+// forgot-password endpoint's response is identical whether or not — and
+// however — the account exists, closing an account-enumeration gap.
+
+interface OAuthAccountNoticeData {
+  customerName: string;
+  customerEmail: string;
+  provider: string;
+}
+
+export async function sendOAuthAccountNotice(data: OAuthAccountNoticeData) {
+  const transporter = getTransporter();
+  if (!transporter) {
+    throw new Error("SMTP not configured — cannot send account notice email");
+  }
+
+  const providerLabel = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
+      <div style="text-align:center;padding:20px;background:#065f46;border-radius:8px 8px 0 0">
+        <h1 style="color:#fff;margin:0">Wellness Point</h1>
+      </div>
+      <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
+        <h2 style="color:#065f46">About Your Sign-In</h2>
+        <p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
+        <p>Someone requested a password reset for this email address. Your Wellness Point account uses <strong>${escapeHtml(providerLabel)}</strong> sign-in, so it doesn't have a password to reset.</p>
+        <p>Please sign in using the "${escapeHtml(providerLabel)}" button on our login page instead.</p>
+        <p style="color:#6b7280;font-size:13px">If this wasn't you, you can safely ignore this email.</p>
+      </div>
+      <div style="text-align:center;padding:16px;color:#9ca3af;font-size:12px">
+        © ${new Date().getFullYear()} Wellness Point. All rights reserved.
+      </div>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: FROM_ADDRESS,
+    to: data.customerEmail,
+    subject: "About Your Wellness Point Sign-In",
+    html,
+  });
+}
+
 // ─── Email Verification ──────────────────────────────────────────
 
 interface EmailVerificationData {
@@ -308,7 +357,7 @@ export async function sendEmailVerification(data: EmailVerificationData) {
       </div>
       <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
         <h2 style="color:#065f46">Verify Your Email</h2>
-        <p>Hi <strong>${data.customerName}</strong>,</p>
+        <p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
         <p>Welcome to Wellness Point! Please verify your email address by clicking the button below:</p>
         <div style="text-align:center;margin:24px 0">
           <a href="${data.verifyUrl}" style="display:inline-block;background:#065f46;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600">

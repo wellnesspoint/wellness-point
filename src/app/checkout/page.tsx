@@ -13,6 +13,7 @@ import { ShoppingBag, CreditCard, MapPin, ArrowLeft, Minus, Plus, Trash2, Save }
 import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { FALLBACK_IMAGE } from "@/lib/constants";
 
 declare global {
   interface Window {
@@ -96,6 +97,7 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
   const [shippingSettings, setShippingSettings] = useState({
     flatRate: 99,
     freeShippingThreshold: 999,
@@ -195,19 +197,23 @@ export default function CheckoutPage() {
     }
   }, [session, updateAddress]);
 
+  // Allows apostrophes/hyphens/periods so real names & places aren't rejected
+  // (e.g. "O'Brien", "Mary-Jane", "St. Thomas Mount").
+  const nameLikeRegex = /^[a-zA-Z][a-zA-Z\s'.-]*$/;
+
   const validateAddress = () => {
     const errors: Record<string, string> = {};
     if (!address.fullName) errors.fullName = "Full name is required";
-    else if (!/^[a-zA-Z\s]+$/.test(address.fullName)) errors.fullName = "Only letters and spaces";
+    else if (!nameLikeRegex.test(address.fullName)) errors.fullName = "Enter a valid name";
     if (!address.email) errors.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) errors.email = "Invalid email address";
     if (!address.phone) errors.phone = "Phone is required";
     else if (!/^\d{10}$/.test(address.phone)) errors.phone = "Must be 10 digits";
     if (!address.street) errors.street = "Address is required";
     if (!address.city) errors.city = "City is required";
-    else if (!/^[a-zA-Z\s]+$/.test(address.city)) errors.city = "Only letters";
+    else if (!nameLikeRegex.test(address.city)) errors.city = "Enter a valid city";
     if (!address.state) errors.state = "State is required";
-    else if (!/^[a-zA-Z\s]+$/.test(address.state)) errors.state = "Only letters";
+    else if (!nameLikeRegex.test(address.state)) errors.state = "Enter a valid state";
     if (!address.pincode) errors.pincode = "Pincode is required";
     else if (!/^\d{6}$/.test(address.pincode)) errors.pincode = "Must be 6 digits";
     setFieldErrors(errors);
@@ -230,6 +236,7 @@ export default function CheckoutPage() {
               fullName: address.fullName,
               phone: address.phone,
               street: address.street,
+              addressLine2: address.addressLine2,
               city: address.city,
               state: address.state,
               pincode: address.pincode,
@@ -285,7 +292,9 @@ export default function CheckoutPage() {
         order_id: orderData.orderId,
         handler: async function (response: any) {
           try {
-            // Verify payment — server recalculates totals and decrements stock
+            // Verify payment — server looks up the order it locked in at
+            // create-order time by this Razorpay order id; it no longer
+            // trusts item/price data resent from the client.
             const verifyRes = await fetch("/api/payment/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -293,19 +302,13 @@ export default function CheckoutPage() {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                orderData: {
-                  items: items.map((item) => ({
-                    product: item._id,
-                    quantity: item.quantity,
-                  })),
-                  shippingAddress: address,
-                },
+                orderData: { shippingAddress: address },
               }),
             });
 
             const verifyData = await verifyRes.json();
 
-            if (verifyData.success) {
+            if (verifyRes.ok && verifyData.success) {
               // Save address to profile:
               // - First-time order (no saved address) → always save
               // - Returning order with edited address → save only if user opted in
@@ -319,10 +322,17 @@ export default function CheckoutPage() {
               toast.success("Order placed successfully!");
               router.push(`/order-confirmation?orderId=${verifyData.order._id}`);
             } else {
-              toast.error("Payment verification failed");
+              // Show the server's actual reason (e.g. "payment received but
+              // stock ran out — support will contact you") instead of a
+              // generic message that hides what actually happened,
+              // especially important since the customer may have already
+              // been charged at this point.
+              toast.error(verifyData.error || "Payment verification failed", { duration: 8000 });
+              setProcessing(false);
             }
           } catch {
-            toast.error("Something went wrong");
+            toast.error("Something went wrong. If you were charged, please contact support.", { duration: 8000 });
+            setProcessing(false);
           }
         },
         prefill: {
@@ -410,7 +420,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.fullName}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                      const val = e.target.value.replace(/[^a-zA-Z\s'.-]/g, "");
                       updateAddress({ ...address, fullName: val });
                       setFieldErrors((prev) => ({ ...prev, fullName: "" }));
                     }}
@@ -477,7 +487,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.city}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                      const val = e.target.value.replace(/[^a-zA-Z\s'.-]/g, "");
                       updateAddress({ ...address, city: val });
                       setFieldErrors((prev) => ({ ...prev, city: "" }));
                     }}
@@ -491,7 +501,7 @@ export default function CheckoutPage() {
                   <Input
                     value={address.state}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                      const val = e.target.value.replace(/[^a-zA-Z\s'.-]/g, "");
                       updateAddress({ ...address, state: val });
                       setFieldErrors((prev) => ({ ...prev, state: "" }));
                     }}
@@ -555,11 +565,13 @@ export default function CheckoutPage() {
                 >
                   <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
                     <Image
-                      src={item.image}
+                      src={imgErrors[item._id] || !item.image ? FALLBACK_IMAGE : item.image}
                       alt={item.name}
                       fill
+                      unoptimized={imgErrors[item._id] || !item.image}
                       className="object-cover"
                       sizes="48px"
+                      onError={() => setImgErrors((prev) => ({ ...prev, [item._id]: true }))}
                     />
                   </div>
                   <div className="flex-1 min-w-0">

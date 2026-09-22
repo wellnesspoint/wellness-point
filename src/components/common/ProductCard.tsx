@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useCartStore } from "@/store/cart";
 import { formatPrice, getDiscountPercentage } from "@/lib/utils";
+import { FALLBACK_IMAGE } from "@/lib/constants";
 import toast from "react-hot-toast";
 
 interface ProductCardProps {
@@ -37,6 +38,7 @@ function ProductCard({ product, isWishlisted = false, onWishlistChange }: Produc
   const { data: session } = useSession();
   const [wishlisted, setWishlisted] = useState(isWishlisted);
   const [wishLoading, setWishLoading] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
   const discountPercent = hasDiscount
@@ -119,11 +121,13 @@ function ProductCard({ product, isWishlisted = false, onWishlistChange }: Produc
       <Link href={`/product/${product.slug}`}>
         <div className="relative aspect-square overflow-hidden bg-gradient-to-b from-wellness-50 to-white">
           <Image
-            src={product.images[0]}
+            src={imgError || !product.images[0] ? FALLBACK_IMAGE : product.images[0]}
             alt={product.name}
             fill
+            unoptimized={imgError || !product.images[0]}
             className={`object-contain p-6 transition-transform duration-500 group-hover:scale-110 ${product.stock === 0 ? "opacity-50 grayscale" : ""}`}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            onError={() => setImgError(true)}
           />
           {product.stock === 0 && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/10">

@@ -63,6 +63,7 @@ export interface InvoiceOrderData {
     fullName: string;
     phone?: string;
     street?: string;
+    addressLine2?: string;
     city?: string;
     state?: string;
     pincode?: string;
@@ -168,8 +169,14 @@ export function generateInvoicePDF(order: InvoiceOrderData): Buffer {
     doc.text(`Email: ${order.userEmail}`, M, y);
     y += 4;
   }
+  const addressLine = [
+    order.shippingAddress?.street,
+    order.shippingAddress?.addressLine2,
+  ]
+    .filter(Boolean)
+    .join(", ");
   doc.text(
-    `${order.shippingAddress?.street || ""}, ${order.shippingAddress?.city || ""}, ${order.shippingAddress?.state || ""} - ${order.shippingAddress?.pincode || ""}`,
+    `${addressLine}, ${order.shippingAddress?.city || ""}, ${order.shippingAddress?.state || ""} - ${order.shippingAddress?.pincode || ""}`,
     M,
     y
   );

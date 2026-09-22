@@ -100,7 +100,11 @@ export async function GET(req: NextRequest) {
     }
 
     // --- Summary Stats ---
-    const totalOrders = await Order.countDocuments();
+    // "pending" rows are checkout attempts that never completed payment (see
+    // /api/payment/create-order) — excluded here so "Total Orders" means
+    // real orders, not abandoned carts. They're still visible via
+    // paymentStatusCounts.pending below.
+    const totalOrders = await Order.countDocuments({ paymentStatus: { $ne: "pending" } });
     const paidOrders = await Order.countDocuments({ paymentStatus: "paid" });
     const totalRevenue = allPaidOrders.reduce((sum: number, o: any) => sum + calcTotal(o), 0);
     const totalCustomers = await User.countDocuments({ role: "user" });

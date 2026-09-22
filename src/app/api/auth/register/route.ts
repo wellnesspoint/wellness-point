@@ -5,9 +5,25 @@ import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { sanitizeInput, isValidEmail } from "@/lib/utils";
 import { sendEmailVerification } from "@/lib/email";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 5 registrations per 15 minutes per IP — registration had
+    // no limiter at all, making it usable for verification-email spam
+    // against arbitrary addresses and for account-enumeration at scale.
+    const ip = getClientIp(req);
+    const { success: withinLimit } = rateLimit(`register:${ip}`, {
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "Too many registration attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { name, email, password } = body;
 

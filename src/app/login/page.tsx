@@ -44,6 +44,9 @@ function LoginForm() {
     if (err === "invalid-verification") {
       toast.error("Invalid verification link.");
     }
+    if (err === "oauth-email-exists") {
+      toast.error("An account with this email already exists. Please sign in with your email and password instead.");
+    }
   }, [searchParams]);
 
   const handleResendVerification = async () => {

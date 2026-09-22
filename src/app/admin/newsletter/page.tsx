@@ -190,12 +190,9 @@ export default function AdminNewsletterPage() {
                 <h3 className="mb-2 text-lg font-semibold text-emerald-800">
                   {subject || "(No subject)"}
                 </h3>
-                <div
-                  className="text-sm leading-relaxed text-gray-700"
-                  dangerouslySetInnerHTML={{
-                    __html: body.replace(/\n/g, "<br />"),
-                  }}
-                />
+                <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
+                  {body}
+                </div>
               </div>
             )}
 

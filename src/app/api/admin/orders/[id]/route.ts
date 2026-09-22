@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import connectDB from "@/lib/db";
 import Order from "@/models/Order";
+import Product from "@/models/Product";
 
 export async function PUT(
   request: NextRequest,
@@ -38,15 +39,34 @@ export async function PUT(
       updateFields.notes = body.notes;
     }
 
+    // Load the current order first — stock must only be restored ONCE, on
+    // the transition INTO cancelled/refunded, never on every save while it
+    // stays in that state (e.g. an admin editing notes on an already
+    // cancelled order shouldn't re-credit stock a second time).
+    const existing = await Order.findById(id);
+    if (!existing) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const enteringCancelled =
+      updateFields.orderStatus === "cancelled" && existing.orderStatus !== "cancelled";
+    const enteringRefunded =
+      updateFields.paymentStatus === "refunded" && existing.paymentStatus !== "refunded";
+
+    if ((enteringCancelled || enteringRefunded) && !existing.stockRestored) {
+      for (const item of existing.items) {
+        await Product.findByIdAndUpdate(item.product, {
+          $inc: { stock: item.quantity },
+        });
+      }
+      updateFields.stockRestored = true;
+    }
+
     const order = await Order.findByIdAndUpdate(
       id,
       { $set: updateFields },
       { new: true }
     ).populate("user", "name email");
-
-    if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
 
     return NextResponse.json({ order });
   } catch (error) {

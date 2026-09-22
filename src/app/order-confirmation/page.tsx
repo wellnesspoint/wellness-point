@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import confetti from "canvas-confetti";
+import { FALLBACK_IMAGE } from "@/lib/constants";
 
 interface OrderData {
   _id: string;
@@ -24,6 +25,7 @@ interface OrderData {
     email?: string;
     phone: string;
     street: string;
+    addressLine2?: string;
     city: string;
     state: string;
     pincode: string;
@@ -42,6 +44,7 @@ function OrderConfirmationContent() {
   const orderId = searchParams.get("orderId");
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     // Fire confetti on mount
@@ -140,11 +143,13 @@ function OrderConfirmationContent() {
                 <div key={idx} className="flex items-center gap-4">
                   <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
                     <Image
-                      src={item.image}
+                      src={imgErrors[idx] || !item.image ? FALLBACK_IMAGE : item.image}
                       alt={item.name}
                       fill
+                      unoptimized={imgErrors[idx] || !item.image}
                       className="object-cover"
                       sizes="64px"
+                      onError={() => setImgErrors((prev) => ({ ...prev, [idx]: true }))}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -201,6 +206,9 @@ function OrderConfirmationContent() {
                 {order.shippingAddress.fullName}
               </p>
               <p>{order.shippingAddress.street}</p>
+              {order.shippingAddress.addressLine2 && (
+                <p>{order.shippingAddress.addressLine2}</p>
+              )}
               <p>
                 {order.shippingAddress.city}, {order.shippingAddress.state} —{" "}
                 {order.shippingAddress.pincode}

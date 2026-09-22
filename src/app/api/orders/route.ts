@@ -13,8 +13,15 @@ export async function GET() {
 
     await connectDB();
 
+    // "pending" orders are created the moment checkout starts (see
+    // /api/payment/create-order) so a total can be locked in before payment —
+    // if the customer abandons the Razorpay modal, that row never becomes a
+    // real order. Exclude it here so abandoned checkouts don't show up as
+    // phantom orders; "failed" orders (payment captured but stock ran out)
+    // ARE shown since the customer was actually charged for those.
     const orders = await Order.find({
       user: (session.user as any).id,
+      paymentStatus: { $ne: "pending" },
     })
       .sort({ createdAt: -1 })
       .lean();

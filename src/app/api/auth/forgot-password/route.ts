@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
-import { sendPasswordResetEmail } from "@/lib/email";
+import { sendPasswordResetEmail, sendOAuthAccountNotice } from "@/lib/email";
 import { isValidEmail } from "@/lib/utils";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+
+const GENERIC_MESSAGE =
+  "If an account with that email exists, we've sent instructions to it.";
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,20 +39,25 @@ export async function POST(req: NextRequest) {
     const anyUser = await User.findOne({ email: email.toLowerCase() });
 
     if (!anyUser) {
-      // Return generic success to prevent email enumeration
-      return NextResponse.json({
-        message: "If an account with that email exists, a reset link has been sent.",
-      });
+      // Generic response — don't reveal whether this email is registered.
+      return NextResponse.json({ message: GENERIC_MESSAGE });
     }
 
-    // If the user signed up via Google/Facebook, they can't reset a password
+    // If the user signed up via Google/Facebook, they can't reset a password.
+    // Tell THEM via email, not via the API response — returning a distinct
+    // error here would let an attacker enumerate which emails are
+    // registered (and by which provider) by watching the response differ.
     if (anyUser.provider !== "credentials") {
-      return NextResponse.json(
-        {
-          error: `This account uses ${anyUser.provider.charAt(0).toUpperCase() + anyUser.provider.slice(1)} sign-in. Please log in with ${anyUser.provider.charAt(0).toUpperCase() + anyUser.provider.slice(1)} instead.`,
-        },
-        { status: 400 }
-      );
+      try {
+        await sendOAuthAccountNotice({
+          customerName: anyUser.name,
+          customerEmail: anyUser.email,
+          provider: anyUser.provider,
+        });
+      } catch (err) {
+        console.error("Failed to send OAuth account notice:", err);
+      }
+      return NextResponse.json({ message: GENERIC_MESSAGE });
     }
 
     const user = anyUser;
@@ -84,9 +92,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      message: "If an account with that email exists, a reset link has been sent.",
-    });
+    return NextResponse.json({ message: GENERIC_MESSAGE });
   } catch (error) {
     console.error("Forgot password error:", error);
     return NextResponse.json(

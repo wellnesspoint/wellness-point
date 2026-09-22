@@ -14,6 +14,7 @@ interface Address {
   fullName: string;
   phone: string;
   street: string;
+  addressLine2?: string;
   city: string;
   state: string;
   pincode: string;
@@ -24,6 +25,7 @@ const emptyAddress: Address = {
   fullName: "",
   phone: "",
   street: "",
+  addressLine2: "",
   city: "",
   state: "",
   pincode: "",
@@ -185,6 +187,16 @@ export default function AddressesPage() {
                   placeholder="123, MG Road"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <Label>Address Line 2 <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                <Input
+                  value={form.addressLine2 || ""}
+                  onChange={(e) =>
+                    setForm({ ...form, addressLine2: e.target.value })
+                  }
+                  placeholder="Apartment, suite, landmark, etc."
+                />
+              </div>
               <div>
                 <Label>City</Label>
                 <Input
@@ -252,7 +264,8 @@ export default function AddressesPage() {
             </p>
             <p className="mt-0.5 text-sm text-muted-foreground">{addresses[0].phone}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {addresses[0].street}, {addresses[0].city}, {addresses[0].state} – {addresses[0].pincode}
+              {addresses[0].street}
+              {addresses[0].addressLine2 && `, ${addresses[0].addressLine2}`}, {addresses[0].city}, {addresses[0].state} – {addresses[0].pincode}
             </p>
             <div className="mt-3 flex gap-3">
               <button

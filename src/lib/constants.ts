@@ -1,3 +1,19 @@
+// Shown when a product's image URL fails to load (e.g. a dead hotlinked
+// third-party URL) instead of the browser's default broken-image icon.
+// An inline SVG data URI needs no extra asset file or network request.
+export const FALLBACK_IMAGE =
+  "data:image/svg+xml;charset=UTF-8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+      <rect width="400" height="400" fill="#f0f4f1"/>
+      <g fill="none" stroke="#c3d3c8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="90" y="110" width="220" height="180" rx="12"/>
+        <circle cx="150" cy="165" r="18"/>
+        <path d="M90 250l60-60 40 40 60-70 60 80"/>
+      </g>
+    </svg>`
+  );
+
 export const SITE_CONFIG = {
   name: "Wellness Point",
   description:

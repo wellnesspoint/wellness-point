@@ -38,6 +38,7 @@ interface Order {
     email?: string;
     phone: string;
     street: string;
+    addressLine2?: string;
     city: string;
     state: string;
     pincode: string;
@@ -197,7 +198,7 @@ async function downloadInvoice(order: Order) {
     y += 4;
   }
   doc.text(
-    `${order.shippingAddress?.street || ""}, ${order.shippingAddress?.city || ""}, ${order.shippingAddress?.state || ""} - ${order.shippingAddress?.pincode || ""}`,
+    `${[order.shippingAddress?.street, order.shippingAddress?.addressLine2].filter(Boolean).join(", ")}, ${order.shippingAddress?.city || ""}, ${order.shippingAddress?.state || ""} - ${order.shippingAddress?.pincode || ""}`,
     M,
     y
   );
@@ -344,6 +345,10 @@ async function downloadInvoice(order: Order) {
   doc.setTextColor(50);
   if (order.shippingAddress?.street) {
     doc.text(order.shippingAddress.street, M, sy);
+    sy += 6;
+  }
+  if (order.shippingAddress?.addressLine2) {
+    doc.text(order.shippingAddress.addressLine2, M, sy);
     sy += 6;
   }
   doc.text(
@@ -648,6 +653,9 @@ export default function AdminOrdersPage() {
               <CardContent className="text-sm space-y-1">
                 <p className="font-medium">{o.shippingAddress?.fullName}</p>
                 <p className="text-muted-foreground">{o.shippingAddress?.street}</p>
+                {o.shippingAddress?.addressLine2 && (
+                  <p className="text-muted-foreground">{o.shippingAddress.addressLine2}</p>
+                )}
                 <p className="text-muted-foreground">
                   {o.shippingAddress?.city}, {o.shippingAddress?.state} - {o.shippingAddress?.pincode}
                 </p>

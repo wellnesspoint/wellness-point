@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import ProductDetailClient from "./ProductDetailClient";
 import connectDB from "@/lib/db";
 import Product from "@/models/Product";
+import { stripSiteNameSuffix } from "@/lib/utils";
+import { SITE_CONFIG } from "@/lib/constants";
 
 const getProduct = cache(async (slug: string) => {
   await connectDB();
@@ -22,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return {
-    title: product.metaTitle || product.name,
+    title: stripSiteNameSuffix(product.metaTitle || product.name, SITE_CONFIG.name),
     description: product.metaDescription || product.shortDescription,
     openGraph: {
       title: product.name,
