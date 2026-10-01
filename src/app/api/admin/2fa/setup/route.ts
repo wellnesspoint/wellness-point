@@ -6,6 +6,8 @@ import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import crypto from "crypto";
 import mongoose from "mongoose";
+import { rateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 /**
  * GET /api/admin/2fa/setup
@@ -17,6 +19,22 @@ export async function GET() {
     if (!session) return unauthorizedResponse();
 
     await connectDB();
+
+    // Never replace the secret of an account that already has 2FA on: the
+    // stored secret would change while twoFactorEnabled stays true, locking
+    // the admin out of their authenticator. Disable 2FA first to re-enrol.
+    const current = await mongoose.connection.db!
+      .collection("users")
+      .findOne(
+        { _id: new mongoose.Types.ObjectId(session.user.id) },
+        { projection: { twoFactorEnabled: 1 } }
+      );
+    if (current?.twoFactorEnabled) {
+      return NextResponse.json(
+        { error: "2FA is already enabled. Disable it first to set it up again." },
+        { status: 400 }
+      );
+    }
 
     // Generate a new TOTP secret
     const secret = new OTPAuth.Secret({ size: 20 });
@@ -68,12 +86,24 @@ export async function POST(req: Request) {
     const session = await checkAdmin();
     if (!session) return unauthorizedResponse();
 
-    const { code } = await req.json();
+    const { code: rawCode } = await req.json().catch(() => ({}));
+    const code = typeof rawCode === "string" ? rawCode.trim() : "";
 
     if (!code) {
       return NextResponse.json(
         { error: "Verification code is required" },
         { status: 400 }
+      );
+    }
+
+    const { success: withinLimit } = await rateLimit(`admin-2fa-setup:${session.user.id}`, {
+      limit: 10,
+      windowMs: 10 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429 }
       );
     }
 
@@ -84,8 +114,12 @@ export async function POST(req: Request) {
       .collection("users")
       .findOne(
         { _id: new mongoose.Types.ObjectId(session.user.id) },
-        { projection: { twoFactorSecret: 1, email: 1 } }
+        { projection: { twoFactorSecret: 1, twoFactorEnabled: 1, email: 1 } }
       );
+    if (user?.twoFactorEnabled) {
+      // Otherwise a bare TOTP code could mint a fresh set of backup codes.
+      return NextResponse.json({ error: "2FA is already enabled." }, { status: 400 });
+    }
     if (!user || !user.twoFactorSecret) {
       return NextResponse.json(
         { error: "2FA setup not initiated. Generate a QR code first." },
@@ -134,6 +168,13 @@ export async function POST(req: Request) {
       },
       { strict: false }
     );
+
+    await logAudit(session, {
+      action: "admin.2fa_enable",
+      entity: "admin",
+      entityId: session.user.id,
+      summary: `${session.user.email} enabled 2FA`,
+    });
 
     return NextResponse.json({
       message: "2FA enabled successfully!",

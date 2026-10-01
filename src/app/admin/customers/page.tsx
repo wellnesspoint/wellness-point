@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useConfirm } from "@/components/admin/ConfirmProvider";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -20,8 +21,18 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
+import { downloadCsv } from "@/lib/csv";
+import Pagination, { useDebounced } from "@/components/admin/Pagination";
 
 interface UserItem {
   _id: string;
@@ -35,35 +46,66 @@ interface UserItem {
   addresses?: any[];
   orderCount?: number;
   totalSpent?: number;
+  lastOrderAt?: string;
 }
 
+const PAGE_SIZE = 25;
+
 export default function AdminCustomersPage() {
+  const confirm = useConfirm();
   const [users, setUsers] = useState<UserItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
+  const requestId = useRef(0);
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
+
+  // "Email this customer" dialog
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  const fetchUsers = (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    fetch("/api/admin/users")
-      .then((r) => r.json())
-      .then((d) => setUsers(d.users || []))
-      .catch(() => { })
-      .finally(() => {
-        setLoading(false);
-        setRefreshing(false);
-      });
-  };
+  const fetchUsers = useCallback(
+    async (isRefresh = false) => {
+      const id = ++requestId.current;
+      if (isRefresh) setRefreshing(true);
+      try {
+        const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+        if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+        const res = await fetch(`/api/admin/users?${params}`);
+        const d = await res.json();
+        if (id !== requestId.current) return; // a newer request superseded this one
+        if (!res.ok) throw new Error(d.error || "Failed to load customers");
+        setUsers(d.users || []);
+        setTotal(d.total || 0);
+        setPages(d.pages || 1);
+      } catch (err) {
+        if (id === requestId.current) {
+          toast.error(err instanceof Error ? err.message : "Failed to load customers");
+        }
+      } finally {
+        if (id === requestId.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    },
+    [page, debouncedSearch]
+  );
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   const viewUser = async (user: UserItem) => {
     setSelectedUser(user);
@@ -103,54 +145,83 @@ export default function AdminCustomersPage() {
   };
 
   const handleDeleteUser = async (userId: string, name: string) => {
-    if (!confirm(`Permanently delete ${name || "this user"}? This cannot be undone.`)) return;
+    if (!(await confirm(`Permanently delete ${name || "this user"}? This cannot be undone.`))) return;
     try {
       const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
         toast.error(data.error || "Failed to delete");
         return;
       }
       setUsers((prev) => prev.filter((u) => u._id !== userId));
+      fetchUsers();
       if (selectedUser?._id === userId) {
         setSelectedUser(null);
         setUserOrders([]);
       }
-      toast.success("User deleted");
+      toast.success(data.anonymized ? "Customer has orders, so the account was anonymised" : "User deleted");
     } catch {
       toast.error("Failed to delete user");
     }
   };
 
-  const downloadCSV = () => {
-    const headers = ["Name", "Email", "Phone", "Provider", "Role", "Status", "Joined"];
-    const rows = filtered.map((u) => [
-      u.name || "",
-      u.email,
-      u.phone || "",
-      u.provider || "credentials",
-      u.role,
-      u.isActive !== false ? "Active" : "Blocked",
-      new Date(u.createdAt).toLocaleDateString("en-IN"),
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV downloaded");
+  const sendEmail = async () => {
+    if (!selectedUser || !emailSubject.trim() || !emailMessage.trim()) return;
+    setEmailSending(true);
+    try {
+      const res = await fetch(`/api/admin/users/${selectedUser._id}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: emailSubject, message: emailMessage }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Failed to send email");
+      toast.success(`Email sent to ${selectedUser.email}`);
+      setEmailOpen(false);
+      setEmailSubject("");
+      setEmailMessage("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send email");
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const downloadCSV = async () => {
+    try {
+      // Export every customer matching the search, not just this page.
+      const params = new URLSearchParams({ all: "1" });
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      const res = await fetch(`/api/admin/users?${params}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Export failed");
+      const headers = ["Name", "Email", "Phone", "Provider", "Role", "Status", "Joined", "Orders", "Total spent", "Last order"];
+      const rows = (d.users as UserItem[]).map((u) => [
+        u.name || "",
+        u.email,
+        u.phone || "",
+        u.provider || "credentials",
+        u.role,
+        u.isActive !== false ? "Active" : "Blocked",
+        new Date(u.createdAt).toLocaleDateString("en-IN"),
+        u.orderCount ?? 0,
+        u.totalSpent ?? 0,
+        u.lastOrderAt ? new Date(u.lastOrderAt).toLocaleDateString("en-IN") : "",
+      ]);
+      downloadCsv(`customers-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+      toast.success("CSV downloaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export failed");
+    }
   };
 
   const bulkDelete = async () => {
     const ids = selectableFilteredIds.filter((id) => selectedIds.has(id));
     if (ids.length === 0) return;
     if (
-      !confirm(
-        `Permanently delete ${ids.length} customer${ids.length > 1 ? "s" : ""}? Their wishlists and reviews will be removed too. This cannot be undone.`
-      )
+      !(await confirm(
+        `Permanently delete ${ids.length} customer${ids.length > 1 ? "s" : ""}? Their wishlists and reviews will be removed. Customers who have orders are anonymised instead of removed. This cannot be undone.`
+      ))
     )
       return;
 
@@ -169,10 +240,14 @@ export default function AdminCustomersPage() {
       const deleted = new Set<string>(data.deleted || []);
       setUsers((prev) => prev.filter((u) => !deleted.has(u._id)));
       setSelectedIds(new Set());
+      fetchUsers();
+      const note = data.anonymized?.length
+        ? ` (${data.anonymized.length} with orders anonymised)`
+        : "";
       if (data.skipped?.length) {
-        toast.success(`${deleted.size} deleted, ${data.skipped.length} skipped (admin or not found)`);
+        toast.success(`${deleted.size} deleted${note}, ${data.skipped.length} skipped (admin or not found)`);
       } else {
-        toast.success(`${deleted.size} customer${deleted.size !== 1 ? "s" : ""} deleted`);
+        toast.success(`${deleted.size} customer${deleted.size !== 1 ? "s" : ""} deleted${note}`);
       }
     } catch {
       toast.error("Failed to delete customers");
@@ -181,12 +256,8 @@ export default function AdminCustomersPage() {
     }
   };
 
-  const filtered = users.filter(
-    (u) =>
-      u.name?.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.phone?.includes(search)
-  );
+  // Search/paging happen on the server; `users` is already the visible page.
+  const filtered = users;
 
   // Admins can never be bulk-deleted, so they get no checkbox.
   const selectableFilteredIds = filtered.filter((u) => u.role !== "admin").map((u) => u._id);
@@ -226,6 +297,36 @@ export default function AdminCustomersPage() {
     const u = selectedUser;
     return (
       <div className="space-y-6">
+        <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Email {u.name || u.email}</DialogTitle>
+              <DialogDescription>Sent from your support address to {u.email}.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="Subject"
+                maxLength={150}
+              />
+              <textarea
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                placeholder="Message"
+                rows={7}
+                maxLength={5000}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" onClick={() => setEmailOpen(false)}>Cancel</Button>
+              <Button variant="wellness" onClick={sendEmail} disabled={emailSending || !emailSubject.trim() || !emailMessage.trim()}>
+                {emailSending ? "Sending..." : "Send email"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setSelectedUser(null); setUserOrders([]); }}
@@ -285,7 +386,20 @@ export default function AdminCustomersPage() {
                   <span className="text-muted-foreground">Joined</span>
                   <span>{new Date(u.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Lifetime spend</span>
+                  <span className="font-semibold">₹{(u.totalSpent ?? 0).toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Orders</span>
+                  <span>{u.orderCount ?? userOrders.length}</span>
+                </div>
               </div>
+              {u.role !== "admin" && (
+                <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => setEmailOpen(true)}>
+                  <Mail className="mr-1 h-4 w-4" /> Email this customer
+                </Button>
+              )}
               {u.role !== "admin" && (
                 <div className="flex gap-2 mt-2">
                   <Button
@@ -413,7 +527,7 @@ export default function AdminCustomersPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-foreground">
-          Customers ({users.length})
+          Customers ({total})
         </h1>
         <div className="flex gap-2">
           <div className="relative flex-1 sm:w-64">
@@ -421,7 +535,10 @@ export default function AdminCustomersPage() {
             <Input
               placeholder="Search customers..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="pl-9"
             />
           </div>
@@ -486,6 +603,9 @@ export default function AdminCustomersPage() {
                 </th>
                 <th className="pb-3 font-medium">Customer</th>
                 <th className="pb-3 font-medium">Provider</th>
+                <th className="pb-3 font-medium text-right">Orders</th>
+                <th className="pb-3 font-medium text-right">Spent</th>
+                <th className="pb-3 font-medium">Last order</th>
                 <th className="pb-3 font-medium">Role</th>
                 <th className="pb-3 font-medium">Status</th>
                 <th className="pb-3 font-medium">Joined</th>
@@ -528,6 +648,15 @@ export default function AdminCustomersPage() {
                     <span className="rounded-full bg-accent px-2 py-0.5 text-xs capitalize">
                       {user.provider || "credentials"}
                     </span>
+                  </td>
+                  <td className="py-3 text-right text-sm">{user.orderCount ?? 0}</td>
+                  <td className="py-3 text-right text-sm font-medium">
+                    {(user.totalSpent ?? 0) > 0 ? `₹${(user.totalSpent ?? 0).toLocaleString("en-IN")}` : "—"}
+                  </td>
+                  <td className="py-3 text-xs text-muted-foreground">
+                    {user.lastOrderAt
+                      ? new Date(user.lastOrderAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })
+                      : "—"}
                   </td>
                   <td className="py-3">
                     <span
@@ -588,6 +717,18 @@ export default function AdminCustomersPage() {
           </table>
         </div>
       )}
+
+      <Pagination
+        page={page}
+        pages={pages}
+        total={total}
+        limit={PAGE_SIZE}
+        onPageChange={(p) => {
+          setSelectedIds(new Set());
+          setPage(p);
+        }}
+        disabled={refreshing}
+      />
     </div>
   );
 }

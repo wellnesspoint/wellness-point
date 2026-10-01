@@ -1,3 +1,4 @@
+import { publicBlogFilter } from "@/lib/blog-visibility";
 import { MetadataRoute } from "next";
 import connectDB from "@/lib/db";
 import Product from "@/models/Product";
@@ -43,7 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }));
 
-    const blogs = await Blog.find({ isPublished: true })
+    const blogs = await Blog.find(publicBlogFilter())
       .select("slug updatedAt")
       .lean();
 

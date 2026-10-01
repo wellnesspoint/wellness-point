@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Blog from "@/models/Blog";
+import { publicBlogFilter } from "@/lib/blog-visibility";
 
 export async function GET(
     _req: NextRequest,
@@ -12,7 +13,7 @@ export async function GET(
 
         const blog = await Blog.findOne({
             slug,
-            isPublished: true,
+            ...publicBlogFilter(),
         });
 
         if (!blog) {

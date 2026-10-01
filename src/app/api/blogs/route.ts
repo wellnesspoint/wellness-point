@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Blog from "@/models/Blog";
+import { publicBlogFilter } from "@/lib/blog-visibility";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    const blogs = await Blog.find({ isPublished: true })
+    const blogs = await Blog.find(publicBlogFilter())
       .sort({ createdAt: -1 })
       .limit(limit)
       .select("-content")

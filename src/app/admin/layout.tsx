@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import ConfirmProvider from "@/components/admin/ConfirmProvider";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -24,22 +25,32 @@ import {
   ShieldCheck,
   ChevronDown,
   MessageCircle,
+  Ticket,
+  ShoppingCart,
+  History,
+  Settings,
 } from "lucide-react";
 
-const adminLinks = [
+type BadgeKey = "orders" | "contacts" | "reviews" | "abandoned";
+
+const adminLinks: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: BadgeKey }[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/products", label: "Products", icon: Package },
-  { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
+  { href: "/admin/orders", label: "Orders", icon: ShoppingBag, badge: "orders" },
   { href: "/admin/customers", label: "Customers", icon: Users },
+  { href: "/admin/abandoned", label: "Abandoned Carts", icon: ShoppingCart, badge: "abandoned" },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
-  { href: "/admin/reviews", label: "Reviews", icon: Star },
-  { href: "/admin/contacts", label: "Contact Us", icon: MessageCircle },
+  { href: "/admin/reviews", label: "Reviews", icon: Star, badge: "reviews" },
+  { href: "/admin/contacts", label: "Contact Us", icon: MessageCircle, badge: "contacts" },
   { href: "/admin/blogs", label: "Blogs", icon: FileText },
   { href: "/admin/testimonials", label: "Testimonials", icon: MessageSquare },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail },
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone },
+  { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/shipping", label: "Shipping", icon: Truck },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "/admin/audit", label: "Audit Log", icon: History },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
   { href: "/admin/security", label: "Security", icon: ShieldCheck },
 ];
 
@@ -60,6 +71,7 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [badges, setBadges] = useState<Partial<Record<BadgeKey, number>>>({});
   const [authStatus, setAuthStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
 
   // Allow /admin/login to render without auth
@@ -95,6 +107,65 @@ export default function AdminLayout({
     }
   }, [authStatus, router, isLoginPage]);
 
+  // Sidebar badges (new orders, unanswered contacts, reviews awaiting approval, ...).
+  // Refreshed every minute and whenever the tab regains focus.
+  useEffect(() => {
+    if (authStatus !== "authenticated") return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/admin/summary");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setBadges(data.badges || {});
+      } catch {
+        // badges are cosmetic
+      }
+    };
+    load();
+    const timer = setInterval(load, 60_000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [authStatus, pathname]);
+
+  // When the admin token expires (or the admin is deactivated/demoted) mid-session,
+  // every admin API call starts answering 403 "Unauthorized" and pages silently show
+  // empty data. Watch for that and send the admin back to the login screen.
+  useEffect(() => {
+    if (isLoginPage) return;
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const res = await originalFetch(...args);
+      try {
+        const input = args[0];
+        const url = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+        if (
+          res.status === 403 &&
+          url.includes("/api/admin/") &&
+          !url.includes("/api/admin/auth/")
+        ) {
+          // Other 403s (e.g. "Cannot delete admin users") carry a different message.
+          const body = await res.clone().json().catch(() => null);
+          if (typeof body?.error === "string" && body.error.startsWith("Unauthorized")) {
+            setAdminUser(null);
+            setAuthStatus("unauthenticated");
+          }
+        }
+      } catch {
+        // never break the original request
+      }
+      return res;
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [isLoginPage]);
+
   const handleLogout = async (redirectTo: string) => {
     await fetch("/api/admin/auth/logout", { method: "POST" });
     setAdminUser(null);
@@ -124,6 +195,7 @@ export default function AdminLayout({
   const currentPage = adminLinks.find((l) => l.href === pathname)?.label || "Admin";
 
   return (
+    <ConfirmProvider>
     <div
       className="flex min-h-screen bg-muted/50"
       style={{ "--accent": "210 40% 94%", "--accent-foreground": "215 16% 35%" } as React.CSSProperties}
@@ -138,7 +210,7 @@ export default function AdminLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen w-64 transform border-r border-border bg-card transition-transform lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed left-0 top-0 z-40 h-screen w-64 transform border-r border-border bg-card transition-transform lg:sticky lg:top-0 lg:shrink-0 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
       >
         <div className="flex h-full flex-col">
@@ -176,7 +248,12 @@ export default function AdminLayout({
                     }`}
                 >
                   <link.icon className="h-4 w-4" />
-                  {link.label}
+                  <span className="flex-1">{link.label}</span>
+                  {link.badge && (badges[link.badge] ?? 0) > 0 && (
+                    <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      {(badges[link.badge] ?? 0) > 99 ? "99+" : badges[link.badge]}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -184,13 +261,14 @@ export default function AdminLayout({
 
           {/* Bottom: Back to Store */}
           <div className="border-t border-border p-3">
-            <button
-              onClick={() => handleLogout("/")}
+            {/* A plain link: this used to sign the admin out as a side effect. */}
+            <Link
+              href="/"
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
               Back to Store
-            </button>
+            </Link>
           </div>
         </div>
       </aside>
@@ -261,5 +339,6 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
+    </ConfirmProvider>
   );
 }

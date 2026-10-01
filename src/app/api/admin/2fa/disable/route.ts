@@ -5,6 +5,8 @@ import User from "@/models/User";
 import * as OTPAuth from "otpauth";
 import crypto from "crypto";
 import mongoose from "mongoose";
+import { rateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 /**
  * POST /api/admin/2fa/disable
@@ -16,12 +18,26 @@ export async function POST(req: Request) {
     const session = await checkAdmin();
     if (!session) return unauthorizedResponse();
 
-    const { code } = await req.json();
+    const { code: rawCode } = await req.json().catch(() => ({}));
+    const code = typeof rawCode === "string" ? rawCode.trim() : "";
 
     if (!code) {
       return NextResponse.json(
         { error: "Verification code is required" },
         { status: 400 }
+      );
+    }
+
+    // Brute-force guard: a stolen session shouldn't be able to guess codes
+    // to switch 2FA off.
+    const { success: withinLimit } = await rateLimit(`admin-2fa-disable:${session.user.id}`, {
+      limit: 5,
+      windowMs: 10 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429 }
       );
     }
 
@@ -89,6 +105,13 @@ export async function POST(req: Request) {
       },
       { strict: false }
     );
+
+    await logAudit(session, {
+      action: "admin.2fa_disable",
+      entity: "admin",
+      entityId: session.user.id,
+      summary: `${session.user.email} disabled 2FA`,
+    });
 
     return NextResponse.json({
       message: "2FA has been disabled successfully.",

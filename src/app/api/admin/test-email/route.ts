@@ -16,7 +16,12 @@ export async function POST(req: NextRequest) {
     if (!session) return unauthorizedResponse();
 
     const body = await req.json().catch(() => ({}));
-    const testTo = body.to || (session.user as any)?.email || "admin@wellness-point.in";
+    // A test mail only ever goes to the signed-in admin; accepting an
+    // arbitrary `to` made this endpoint an open relay for the store's SMTP.
+    const testTo = (session.user as any)?.email as string | undefined;
+    if (!testTo) {
+      return NextResponse.json({ error: "Admin account has no email" }, { status: 400 });
+    }
 
     const results: Record<string, any> = {};
 

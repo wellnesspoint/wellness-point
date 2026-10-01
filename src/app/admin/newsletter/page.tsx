@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useConfirm } from "@/components/admin/ConfirmProvider";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,6 +17,17 @@ import {
 import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
 
+interface Campaign {
+  _id: string;
+  subject: string;
+  status: "sending" | "done" | "failed";
+  total: number;
+  sent: number;
+  failed: number;
+  createdBy?: string;
+  createdAt: string;
+}
+
 interface Subscriber {
   _id: string;
   email: string;
@@ -24,6 +36,7 @@ interface Subscriber {
 }
 
 export default function AdminNewsletterPage() {
+  const confirm = useConfirm();
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -36,6 +49,31 @@ export default function AdminNewsletterPage() {
   const [preview, setPreview] = useState(false);
 
   const activeCount = subscribers.filter((s) => s.isActive !== false).length;
+
+  // Send history. Sending runs in the background, so poll while any campaign is in progress.
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const anySending = campaigns.some((c) => c.status === "sending");
+
+  const loadCampaigns = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/newsletter/campaigns");
+      if (!res.ok) return;
+      const d = await res.json();
+      setCampaigns(d.campaigns || []);
+    } catch {
+      // history is informational
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
+
+  useEffect(() => {
+    if (!anySending) return;
+    const t = setInterval(loadCampaigns, 3000);
+    return () => clearInterval(t);
+  }, [anySending, loadCampaigns]);
 
   useEffect(() => {
     fetch("/api/admin/newsletter")
@@ -50,7 +88,7 @@ export default function AdminNewsletterPage() {
   );
 
   const handleDelete = async (id: string, email: string) => {
-    if (!confirm(`Delete ${email} from newsletter?`)) return;
+    if (!(await confirm(`Delete ${email} from newsletter?`))) return;
     try {
       const res = await fetch("/api/admin/newsletter", {
         method: "DELETE",
@@ -75,9 +113,10 @@ export default function AdminNewsletterPage() {
     }
 
     if (
-      !confirm(
-        `Send this newsletter to ${activeCount} active subscriber${activeCount !== 1 ? "s" : ""}?`
-      )
+      !(await confirm(
+        `Send this newsletter to ${activeCount} active subscriber${activeCount !== 1 ? "s" : ""}?`,
+        { danger: false, confirmLabel: "Send newsletter", title: "Send newsletter" }
+      ))
     )
       return;
 
@@ -91,7 +130,8 @@ export default function AdminNewsletterPage() {
 
       const data = await res.json();
       if (res.ok) {
-        toast.success(data.message || "Newsletter sent!");
+        toast.success(data.message || "Newsletter is being sent");
+        loadCampaigns();
         setSubject("");
         setBody("");
         setComposeOpen(false);
@@ -307,6 +347,53 @@ export default function AdminNewsletterPage() {
           </table>
         </div>
       )}
+
+      {/* Send history */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-5">
+          <h2 className="mb-3 text-base font-semibold text-foreground">Send history</h2>
+          {campaigns.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">No newsletters sent yet</p>
+          ) : (
+            <ul className="divide-y">
+              {campaigns.map((c) => {
+                const done = c.sent + c.failed;
+                const pct = c.total > 0 ? Math.min(100, Math.round((done / c.total) * 100)) : 0;
+                return (
+                  <li key={c._id} className="py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-sm font-medium text-foreground">{c.subject}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          c.status === "done"
+                            ? "bg-green-100 text-green-700"
+                            : c.status === "failed"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {c.status === "sending" ? `Sending… ${pct}%` : c.status === "done" ? "Sent" : "Failed"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(c.createdAt).toLocaleString("en-IN", {
+                        day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+                      })}
+                      {c.createdBy ? ` · by ${c.createdBy}` : ""} · {c.sent} delivered
+                      {c.failed > 0 ? `, ${c.failed} failed` : ""} of {c.total}
+                    </p>
+                    {c.status === "sending" && (
+                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-muted">
+                        <div className="h-1.5 rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

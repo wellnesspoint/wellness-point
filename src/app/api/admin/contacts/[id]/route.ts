@@ -17,23 +17,42 @@ export async function PUT(req: NextRequest, { params }: Props) {
     const { id } = await params;
     const body = await req.json();
 
-    await connectDB();
-
     const updateData: any = {};
 
     if (body.status) {
+      if (!["new", "read", "replied", "archived"].includes(body.status)) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
       updateData.status = body.status;
     }
 
-    if (body.adminReply) {
-      updateData.adminReply = body.adminReply;
+    let adminReply = "";
+    if (body.adminReply !== undefined) {
+      adminReply = typeof body.adminReply === "string" ? body.adminReply.trim() : "";
+      if (body.adminReply && !adminReply) {
+        return NextResponse.json({ error: "Reply can't be empty" }, { status: 400 });
+      }
+      if (adminReply.length > 5000) {
+        return NextResponse.json({ error: "Reply is too long (max 5000 characters)" }, { status: 400 });
+      }
+    }
+    if (adminReply) {
+      updateData.adminReply = adminReply;
       updateData.adminRepliedAt = new Date();
       updateData.status = "replied";
     }
 
-    const contact = await Contact.findByIdAndUpdate(id, updateData, {
-      new: true,
-    });
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    }
+
+    await connectDB();
+
+    const contact = await Contact.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
 
     if (!contact) {
       return NextResponse.json(
@@ -43,14 +62,14 @@ export async function PUT(req: NextRequest, { params }: Props) {
     }
 
     // Send reply email if admin replied (MUST await — Vercel kills the function after response)
-    if (body.adminReply && contact.email) {
+    if (adminReply && contact.email) {
       try {
         await sendContactReply({
           customerName: contact.name,
           customerEmail: contact.email,
           originalSubject: contact.subject,
           originalMessage: contact.message,
-          adminReply: body.adminReply,
+          adminReply,
         });
         console.log("Contact reply email sent to:", contact.email);
       } catch (emailErr) {

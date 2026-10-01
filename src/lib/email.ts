@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { generateInvoicePDF, InvoiceOrderData } from "./invoice";
 import { escapeHtml } from "./utils";
+import { getCompany } from "./site-settings";
 
 /**
  * Email service for Wellness Point.
@@ -82,6 +83,7 @@ interface OrderEmailData {
     pincode?: string;
   };
   discount?: number;
+  couponCode?: string;
   createdAt?: string | Date;
 }
 
@@ -130,6 +132,7 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
         <div style="text-align:right;margin-top:12px">
           <p style="margin:4px 0">Subtotal: <strong>₹${data.subtotal.toFixed(2)}</strong></p>
           <p style="margin:4px 0">Shipping: <strong>${data.shipping === 0 ? "FREE" : `₹${data.shipping.toFixed(2)}`}</strong></p>
+          ${data.discount ? `<p style="margin:4px 0;color:#15803d">Discount${data.couponCode ? ` (${escapeHtml(data.couponCode)})` : ""}: <strong>-₹${data.discount.toFixed(2)}</strong></p>` : ""}
           <p style="margin:4px 0;font-size:18px;color:#065f46">Total: <strong>₹${data.total.toFixed(2)}</strong></p>
         </div>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
@@ -161,7 +164,7 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
       shipping: data.shipping,
       discount: data.discount || 0,
     };
-    const pdfBuffer = generateInvoicePDF(invoiceData);
+    const pdfBuffer = generateInvoicePDF(invoiceData, await getCompany());
     attachments = [
       {
         filename: `Invoice-WP-${orderId8}.pdf`,
@@ -384,4 +387,234 @@ export async function sendEmailVerification(data: EmailVerificationData) {
     html,
   });
   console.log("Verification email sent to:", data.customerEmail);
+}
+
+// ─── Order status emails ───────────────────────────────────────────
+
+export type OrderStatusEmailType = "shipped" | "delivered" | "cancelled" | "refunded";
+
+interface OrderStatusEmailData {
+  type: OrderStatusEmailType;
+  customerName: string;
+  customerEmail: string;
+  orderId: string;
+  total: number;
+  tracking?: { courier?: string; trackingNumber?: string; trackingUrl?: string };
+}
+
+const APP_BASE_URL = () => process.env.NEXT_PUBLIC_APP_URL || "https://wellness-point.in";
+
+function emailShell(inner: string, companyName: string) {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
+      <div style="text-align:center;padding:20px;background:#065f46;border-radius:8px 8px 0 0">
+        <h1 style="color:#fff;margin:0">${escapeHtml(companyName)}</h1>
+      </div>
+      <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">${inner}</div>
+      <div style="text-align:center;padding:16px;color:#9ca3af;font-size:12px">
+        © ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.
+      </div>
+    </div>`;
+}
+
+/** Customer email for an order moving to shipped / delivered / cancelled / refunded. */
+export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
+  if (!data.customerEmail) return;
+  const transporter = getSalesTransporter();
+  if (!transporter) throw new Error("SMTP not configured — cannot send order status email");
+
+  const company = await getCompany();
+  const id = formatOrderId(data.orderId);
+  const t = data.tracking;
+  const hasTracking = !!(t?.courier || t?.trackingNumber || t?.trackingUrl);
+
+  const trackingBlock = hasTracking
+    ? `<div style="background:#ecfdf5;padding:16px;margin:16px 0;border-radius:8px">
+         <p style="color:#065f46;font-weight:600;margin:0 0 8px">Tracking details</p>
+         ${t?.courier ? `<p style="margin:4px 0">Courier: <strong>${escapeHtml(t.courier)}</strong></p>` : ""}
+         ${t?.trackingNumber ? `<p style="margin:4px 0">Tracking number: <strong>${escapeHtml(t.trackingNumber)}</strong></p>` : ""}
+         ${
+           t?.trackingUrl && /^https:\/\//i.test(t.trackingUrl)
+             ? `<p style="margin:8px 0 0"><a href="${escapeHtml(t.trackingUrl)}" style="color:#065f46;font-weight:600">Track your package →</a></p>`
+             : ""
+         }
+       </div>`
+    : "";
+
+  const copy: Record<OrderStatusEmailType, { subject: string; heading: string; body: string }> = {
+    shipped: {
+      subject: `Your order ${id} has shipped`,
+      heading: "Your order is on its way 🚚",
+      body: `Good news — order <strong>${id}</strong> has been shipped.`,
+    },
+    delivered: {
+      subject: `Your order ${id} was delivered`,
+      heading: "Order delivered ✅",
+      body: `Order <strong>${id}</strong> has been delivered. We hope you love it! If anything isn't right, just reply to this email.`,
+    },
+    cancelled: {
+      subject: `Your order ${id} was cancelled`,
+      heading: "Order cancelled",
+      body: `Order <strong>${id}</strong> (₹${data.total.toFixed(2)}) has been cancelled. If you already paid, we'll process your refund and email you once it's initiated.`,
+    },
+    refunded: {
+      subject: `Refund initiated for order ${id}`,
+      heading: "Your refund is on its way 💸",
+      body: `We've refunded ₹${data.total.toFixed(2)} for order <strong>${id}</strong> to your original payment method. It can take 5–7 business days to show up in your account.`,
+    },
+  };
+  const c = copy[data.type];
+
+  const html = emailShell(
+    `<h2 style="color:#065f46;margin-top:0">${c.heading}</h2>
+     <p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
+     <p>${c.body}</p>
+     ${data.type === "shipped" ? trackingBlock : ""}
+     <p style="color:#6b7280;font-size:13px">
+       View your order in your <a href="${APP_BASE_URL()}/dashboard/orders" style="color:#065f46">dashboard</a>.
+       Questions? Contact <a href="mailto:${escapeHtml(company.supportEmail)}" style="color:#065f46">${escapeHtml(company.supportEmail)}</a>.
+     </p>`,
+    company.name
+  );
+
+  await transporter.sendMail({
+    from: FROM_ADDRESS_SALES,
+    to: data.customerEmail,
+    subject: `${c.subject} | ${company.name}`,
+    html,
+  });
+}
+
+// ─── Low-stock alert (to admins) ───────────────────────────────────
+
+export async function sendLowStockAlert(
+  recipients: string[],
+  products: { name: string; stock: number; threshold: number }[]
+) {
+  const transporter = getTransporter();
+  if (!transporter) throw new Error("SMTP not configured — cannot send low-stock alert");
+  const company = await getCompany();
+
+  const rows = products
+    .map(
+      (p) =>
+        `<tr>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb">${escapeHtml(p.name)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;color:${p.stock <= 0 ? "#b91c1c" : "#b45309"}"><strong>${p.stock}</strong></td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${p.threshold}</td>
+        </tr>`
+    )
+    .join("");
+
+  const html = emailShell(
+    `<h2 style="color:#b45309;margin-top:0">Low stock alert ⚠️</h2>
+     <p>${products.length} product${products.length === 1 ? " is" : "s are"} at or below the restock level:</p>
+     <table style="width:100%;border-collapse:collapse;margin:16px 0">
+       <thead><tr style="background:#065f46;color:#fff">
+         <th style="padding:8px;text-align:left">Product</th>
+         <th style="padding:8px;text-align:center">In stock</th>
+         <th style="padding:8px;text-align:center">Alert level</th>
+       </tr></thead>
+       <tbody>${rows}</tbody>
+     </table>
+     <p><a href="${APP_BASE_URL()}/admin/products" style="color:#065f46;font-weight:600">Manage inventory →</a></p>`,
+    company.name
+  );
+
+  await transporter.sendMail({
+    from: FROM_ADDRESS,
+    to: recipients.join(","),
+    subject: `Low stock: ${products.length} product${products.length === 1 ? "" : "s"} need restocking`,
+    html,
+  });
+}
+
+// ─── Abandoned checkout reminder ───────────────────────────────────
+
+interface AbandonedCartEmailData {
+  customerName: string;
+  customerEmail: string;
+  items: { name: string; quantity: number; price: number }[];
+  total: number;
+  couponCode?: string;
+}
+
+export async function sendAbandonedCartEmail(data: AbandonedCartEmailData) {
+  const transporter = getSalesTransporter();
+  if (!transporter) throw new Error("SMTP not configured — cannot send reminder email");
+  const company = await getCompany();
+
+  const rows = data.items
+    .map(
+      (i) =>
+        `<tr>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb">${escapeHtml(i.name)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${i.quantity}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">₹${(i.price * i.quantity).toFixed(2)}</td>
+        </tr>`
+    )
+    .join("");
+
+  const couponBlock = data.couponCode
+    ? `<div style="background:#ecfdf5;padding:16px;margin:16px 0;border-radius:8px;text-align:center">
+         <p style="margin:0 0 4px;color:#065f46">Use code</p>
+         <p style="margin:0;font-size:22px;font-weight:700;letter-spacing:2px;color:#065f46">${escapeHtml(data.couponCode)}</p>
+         <p style="margin:4px 0 0;color:#6b7280;font-size:13px">at checkout</p>
+       </div>`
+    : "";
+
+  const html = emailShell(
+    `<h2 style="color:#065f46;margin-top:0">You left something behind 🛒</h2>
+     <p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
+     <p>You started checking out but didn't finish. Your items are still waiting:</p>
+     <table style="width:100%;border-collapse:collapse;margin:16px 0">
+       <thead><tr style="background:#065f46;color:#fff">
+         <th style="padding:8px;text-align:left">Product</th>
+         <th style="padding:8px;text-align:center">Qty</th>
+         <th style="padding:8px;text-align:right">Price</th>
+       </tr></thead>
+       <tbody>${rows}</tbody>
+     </table>
+     ${couponBlock}
+     <p style="text-align:center;margin:24px 0">
+       <a href="${APP_BASE_URL()}/checkout" style="background:#065f46;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Complete your order</a>
+     </p>
+     <p style="color:#6b7280;font-size:13px">Items are not reserved and may sell out. Questions? Contact <a href="mailto:${escapeHtml(company.supportEmail)}" style="color:#065f46">${escapeHtml(company.supportEmail)}</a>.</p>`,
+    company.name
+  );
+
+  await transporter.sendMail({
+    from: FROM_ADDRESS_SALES,
+    to: data.customerEmail,
+    subject: `Still thinking it over? Your cart is waiting | ${company.name}`,
+    html,
+  });
+}
+
+// ─── Admin → customer message ──────────────────────────────────────
+
+export async function sendCustomerMessage(data: {
+  customerName: string;
+  customerEmail: string;
+  subject: string;
+  message: string;
+}) {
+  const transporter = getTransporter();
+  if (!transporter) throw new Error("SMTP not configured — cannot send email");
+  const company = await getCompany();
+
+  const html = emailShell(
+    `<p>Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
+     <div style="color:#374151;line-height:1.6">${escapeHtml(data.message).replace(/\r?\n/g, "<br />")}</div>
+     <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
+     <p style="color:#6b7280;font-size:13px">Reply to this email or contact <a href="mailto:${escapeHtml(company.supportEmail)}" style="color:#065f46">${escapeHtml(company.supportEmail)}</a>.</p>`,
+    company.name
+  );
+
+  await transporter.sendMail({
+    from: FROM_ADDRESS,
+    to: data.customerEmail,
+    subject: `${data.subject} | ${company.name}`,
+    html,
+  });
 }

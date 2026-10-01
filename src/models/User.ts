@@ -30,6 +30,8 @@ export interface IUser extends Document {
   twoFactorEnabled: boolean;
   twoFactorBackupCodes?: string[];
   passwordChangedAt?: Date;
+  // Set when an account with order history was removed (see lib/user-deletion).
+  anonymizedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +82,7 @@ const userSchema = new Schema<IUser>(
     twoFactorBackupCodes: { type: [String], select: false },
     // Sessions issued before this moment are rejected (set on password reset).
     passwordChangedAt: { type: Date },
+    anonymizedAt: { type: Date },
   },
   {
     timestamps: true,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/admin/ConfirmProvider";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ const emptyForm = {
 };
 
 export default function AdminTestimonialsPage() {
+  const confirm = useConfirm();
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -82,7 +84,7 @@ export default function AdminTestimonialsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this testimonial?")) return;
+    if (!(await confirm("Delete this testimonial?"))) return;
     try {
       const res = await fetch(`/api/admin/testimonials/${id}`, {
         method: "DELETE",

@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/admin/ConfirmProvider";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
+import { REVIEW_REPLIES, fillReply } from "@/lib/canned-replies";
 
 interface Review {
   _id: string;
@@ -33,6 +35,7 @@ interface Review {
 }
 
 export default function AdminReviewsPage() {
+  const confirm = useConfirm();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -91,7 +94,7 @@ export default function AdminReviewsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this review permanently?")) return;
+    if (!(await confirm("Delete this review permanently?"))) return;
     try {
       const res = await fetch(`/api/admin/reviews/${id}`, {
         method: "DELETE",
@@ -277,6 +280,20 @@ export default function AdminReviewsPage() {
                     {/* Reply Form */}
                     {replyingTo === review._id && (
                       <div className="mt-2 space-y-2">
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const t = REVIEW_REPLIES.find((r) => r.label === e.target.value);
+                            if (t) setReplyText(fillReply(t.text, review.name));
+                          }}
+                          className="w-full rounded-lg border bg-background px-3 py-1.5 text-xs text-muted-foreground sm:w-auto"
+                          aria-label="Insert a saved reply"
+                        >
+                          <option value="">Insert a saved reply…</option>
+                          {REVIEW_REPLIES.map((r) => (
+                            <option key={r.label} value={r.label}>{r.label}</option>
+                          ))}
+                        </select>
                         <Textarea
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}

@@ -9,7 +9,7 @@ export async function GET() {
     if (!session) return unauthorizedResponse();
 
     await connectDB();
-    const testimonials = await Testimonial.find().sort({ createdAt: -1 }).lean();
+    const testimonials = await Testimonial.find().sort({ createdAt: -1 }).limit(500).lean();
     return NextResponse.json({ testimonials });
   } catch (error) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -31,6 +31,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const ratingNum = Number(rating);
+    if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      return NextResponse.json({ error: "Rating must be 1 to 5" }, { status: 400 });
+    }
+
     await connectDB();
 
     const testimonial = await Testimonial.create({
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
       role,
       image,
       content,
-      rating,
+      rating: ratingNum,
       isApproved: isApproved ?? true,
     });
 
@@ -46,7 +51,10 @@ export async function POST(req: NextRequest) {
       { message: "Testimonial created", testimonial },
       { status: 201 }
     );
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.name === "ValidationError") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

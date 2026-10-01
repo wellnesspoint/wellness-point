@@ -10,7 +10,7 @@ export async function GET() {
     if (!session) return unauthorizedResponse();
 
     await connectDB();
-    const contacts = await Contact.find().sort({ createdAt: -1 }).lean();
+    const contacts = await Contact.find().sort({ createdAt: -1 }).limit(1000).lean();
     return NextResponse.json({ contacts });
   } catch (error) {
     console.error("Admin contacts list error:", error);

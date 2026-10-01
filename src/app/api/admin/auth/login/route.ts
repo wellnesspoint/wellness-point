@@ -4,6 +4,7 @@ import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import { signAdminToken, getAdminCookieName, signPending2FAToken } from "@/lib/admin-auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
     try {
@@ -99,6 +100,11 @@ export async function POST(req: NextRequest) {
             email: user.email,
             name: user.name,
         });
+
+        await logAudit(
+            { user: { id: user._id.toString(), name: user.name, email: user.email } },
+            { action: "admin.login", entity: "admin", entityId: user._id.toString(), summary: `${user.email} signed in`, meta: { ip } }
+        );
 
         // Set cookie
         const response = NextResponse.json({

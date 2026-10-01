@@ -23,6 +23,9 @@ export async function GET() {
       user: (session.user as any).id,
       paymentStatus: { $ne: "pending" },
     })
+      // Internal/sensitive fields (payment signature, admin names in the status trail)
+      // never go to the browser.
+      .select("-razorpaySignature -statusHistory -finalizing -finalizingAt -stockRestored -reminderSentAt")
       .sort({ createdAt: -1 })
       .lean();
 

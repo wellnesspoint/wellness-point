@@ -43,7 +43,7 @@ export async function verifyAdminToken(): Promise<AdminPayload | null> {
         const token = cookieStore.get(ADMIN_COOKIE)?.value;
         if (!token) return null;
 
-        const decoded = jwt.verify(token, getSecret()) as AdminPayload;
+        const decoded = jwt.verify(token, getSecret()) as AdminPayload & { iat?: number };
         if (decoded.role !== "admin") return null;
 
         // Unlike customer sessions (re-checked every 5 min in the NextAuth jwt
@@ -52,8 +52,19 @@ export async function verifyAdminToken(): Promise<AdminPayload | null> {
         // access for the token's full 7-day life. This costs one lean query
         // per admin API request, which is acceptable given admin traffic volume.
         await connectDB();
-        const dbUser = await User.findById(decoded.id).select("role isActive").lean();
+        const dbUser = await User.findById(decoded.id).select("role isActive passwordChangedAt").lean();
         if (!dbUser || dbUser.role !== "admin" || !dbUser.isActive) {
+            return null;
+        }
+
+        // Sessions issued before a password reset are rejected (customer
+        // sessions already do this in lib/auth.ts), so a stolen token doesn't
+        // outlive the password change.
+        if (
+            dbUser.passwordChangedAt &&
+            decoded.iat &&
+            decoded.iat * 1000 < dbUser.passwordChangedAt.getTime()
+        ) {
             return null;
         }
 

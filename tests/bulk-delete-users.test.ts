@@ -11,18 +11,23 @@ const userFind = vi.fn();
 const userDeleteMany = vi.fn();
 const wishlistDeleteMany = vi.fn();
 const reviewDeleteMany = vi.fn();
+const orderDistinct = vi.fn();
+const userBulkWrite = vi.fn();
 
 vi.mock("@/lib/admin", () => ({
   checkAdmin: () => checkAdmin(),
   unauthorizedResponse: () => new Response(JSON.stringify({ error: "Unauthorized" }), { status: 403 }),
 }));
 vi.mock("@/lib/db", () => ({ default: async () => {} }));
+vi.mock("@/lib/audit", () => ({ logAudit: async () => {} }));
 vi.mock("@/models/User", () => ({
   default: {
     find: (q: any) => ({ select: () => ({ lean: async () => userFind(q) }) }),
     deleteMany: (q: any) => userDeleteMany(q),
+    bulkWrite: (ops: any) => userBulkWrite(ops),
   },
 }));
+vi.mock("@/models/Order", () => ({ default: { distinct: (...a: any[]) => orderDistinct(...a) } }));
 vi.mock("@/models/Wishlist", () => ({ default: { deleteMany: (q: any) => wishlistDeleteMany(q) } }));
 vi.mock("@/models/Review", () => ({ default: { deleteMany: (q: any) => reviewDeleteMany(q) } }));
 
@@ -40,6 +45,7 @@ const call = (body: unknown) =>
 beforeEach(() => {
   vi.clearAllMocks();
   checkAdmin.mockResolvedValue({ user: { id: ME } });
+  orderDistinct.mockResolvedValue([]);
   // The DB lookup only returns non-admin users that were asked for.
   userFind.mockImplementation((q: any) =>
     [A, B].filter((id) => q._id.$in.includes(id)).map((id) => ({ _id: { toString: () => id } }))
@@ -81,6 +87,17 @@ describe("DELETE /api/admin/users (bulk)", () => {
     expect(userFind.mock.calls[0][0]._id.$in).not.toContain(ME);
     // deletion is additionally guarded by role in the delete query itself
     expect(userDeleteMany.mock.calls[0][0].role).toEqual({ $ne: "admin" });
+  });
+
+  it("anonymises (instead of deleting) customers who have orders", async () => {
+    orderDistinct.mockResolvedValue([{ toString: () => A }]);
+    const res = await call({ ids: [A, B] });
+    const json = await res.json();
+    expect(json.anonymized).toEqual([A]);
+    expect(json.removed).toEqual([B]);
+    expect(userDeleteMany.mock.calls[0][0]._id.$in).toEqual([B]);
+    expect(userBulkWrite).toHaveBeenCalledTimes(1);
+    expect(userBulkWrite.mock.calls[0][0][0].updateOne.filter._id).toBe(A);
   });
 
   it("does nothing when every id is skipped", async () => {

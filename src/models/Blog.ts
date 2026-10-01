@@ -10,6 +10,8 @@ export interface IBlog extends Document {
   author: string;
   tags: string[];
   isPublished: boolean;
+  /** When set in the future, a published post stays hidden until then (scheduled publishing). */
+  publishAt?: Date;
   metaTitle?: string;
   metaDescription?: string;
   createdAt: Date;
@@ -27,6 +29,7 @@ const blogSchema = new Schema<IBlog>(
     author: { type: String, default: "Wellness Point" },
     tags: [{ type: String }],
     isPublished: { type: Boolean, default: false },
+    publishAt: { type: Date },
     metaTitle: { type: String },
     metaDescription: { type: String },
   },

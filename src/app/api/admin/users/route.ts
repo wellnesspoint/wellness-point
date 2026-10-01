@@ -2,24 +2,58 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
-import Wishlist from "@/models/Wishlist";
-import Review from "@/models/Review";
+import { removeUsers } from "@/lib/user-deletion";
+import { logAudit } from "@/lib/audit";
+import { USER_PUBLIC_FIELDS } from "@/lib/user-fields";
+import { getCustomerStats } from "@/lib/customer-stats";
+import { escapeRegex, pageMeta, parsePagination } from "@/lib/pagination";
+
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 
 const MAX_BULK_DELETE = 100;
+const EXPORT_LIMIT = 5000;
 
-export async function GET() {
+/**
+ * GET /api/admin/users?page=&limit=&q=&status=active|blocked&role=user|admin&all=1
+ * `all=1` is export mode (up to 5000 rows, no paging).
+ */
+export async function GET(req: NextRequest) {
   try {
     const session = await checkAdmin();
     if (!session) return unauthorizedResponse();
 
     await connectDB();
-    const users = await User.find()
-      .select("-password")
-      .sort({ createdAt: -1 })
-      .lean();
 
-    return NextResponse.json({ users });
+    const sp = new URL(req.url).searchParams;
+    const paging = parsePagination(sp);
+    const exportAll = sp.get("all") === "1";
+
+    const filter: Record<string, unknown> = { anonymizedAt: { $exists: false } };
+    const q = (sp.get("q") || "").trim().slice(0, 100);
+    if (q) {
+      const rx = new RegExp(escapeRegex(q), "i");
+      filter.$or = [{ name: rx }, { email: rx }, { phone: rx }];
+    }
+    const status = sp.get("status");
+    if (status === "active") filter.isActive = { $ne: false };
+    else if (status === "blocked") filter.isActive = false;
+    const role = sp.get("role");
+    if (role === "user" || role === "admin") filter.role = role;
+
+    const query = User.find(filter).select(USER_PUBLIC_FIELDS).sort({ createdAt: -1 });
+    if (exportAll) query.limit(EXPORT_LIMIT);
+    else query.skip(paging.skip).limit(paging.limit);
+
+    const [users, total] = await Promise.all([query.lean(), User.countDocuments(filter)]);
+
+    // Lifetime stats for just these customers, in one aggregation.
+    const stats = await getCustomerStats(users.map((u) => u._id));
+    const withStats = users.map((u) => {
+      const s = stats.get(String(u._id));
+      return { ...u, orderCount: s?.orderCount ?? 0, totalSpent: s?.totalSpent ?? 0, lastOrderAt: s?.lastOrderAt };
+    });
+
+    return NextResponse.json({ users: withStats, ...pageMeta(total, paging) });
   } catch (error) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
@@ -31,7 +65,8 @@ export async function GET() {
  *
  * Admin accounts (and the caller's own account) are never deleted; they are
  * reported back as `skipped`. Wishlists and reviews of deleted users are
- * removed, matching the single-user delete.
+ * removed, matching the single-user delete. Customers with past orders are
+ * anonymised rather than removed so order history stays intact.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -66,12 +101,15 @@ export async function DELETE(req: NextRequest) {
       .lean();
     const deletableIds = deletable.map((u) => u._id.toString());
 
+    const { deleted, anonymized } = await removeUsers(deletableIds);
+
     if (deletableIds.length > 0) {
-      await Promise.all([
-        Wishlist.deleteMany({ user: { $in: deletableIds } }),
-        Review.deleteMany({ user: { $in: deletableIds } }),
-      ]);
-      await User.deleteMany({ _id: { $in: deletableIds }, role: { $ne: "admin" } });
+      await logAudit(session, {
+        action: "user.bulk_delete",
+        entity: "user",
+        summary: `Bulk-removed ${deletableIds.length} customer(s) (${anonymized.length} anonymised)`,
+        meta: { ids: deletableIds },
+      });
     }
 
     const deletedSet = new Set(deletableIds);
@@ -80,6 +118,9 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({
       message: `${deletableIds.length} customer(s) deleted`,
       deleted: deletableIds,
+      // Subset of `deleted` that had orders and was anonymised, not removed.
+      anonymized,
+      removed: deleted,
       skipped: Array.from(new Set(skipped)),
     });
   } catch (error) {

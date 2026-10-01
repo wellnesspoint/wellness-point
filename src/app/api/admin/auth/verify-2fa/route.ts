@@ -10,6 +10,7 @@ import {
   getAdminCookieName,
 } from "@/lib/admin-auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 /**
  * POST /api/admin/auth/verify-2fa
@@ -31,9 +32,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { pendingToken, code } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const pendingToken = body.pendingToken;
+    const code: string = typeof body.code === "string" ? body.code.trim() : "";
 
-    if (!pendingToken || !code) {
+    if (!pendingToken || typeof pendingToken !== "string" || !code) {
       return NextResponse.json(
         { error: "Token and verification code are required" },
         { status: 400 }
@@ -139,6 +142,17 @@ export async function POST(req: NextRequest) {
       email: pending.email,
       name: pending.name,
     });
+
+    await logAudit(
+      { user: { id: pending.id, name: pending.name, email: pending.email } },
+      {
+        action: "admin.login",
+        entity: "admin",
+        entityId: pending.id,
+        summary: `${pending.email} signed in with 2FA${usedBackupCode ? " (backup code)" : ""}`,
+        meta: { ip },
+      }
+    );
 
     const response = NextResponse.json({
       success: true,

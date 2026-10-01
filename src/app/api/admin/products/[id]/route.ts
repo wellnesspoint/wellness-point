@@ -4,6 +4,9 @@ import Product from "@/models/Product";
 import Review from "@/models/Review";
 import Wishlist from "@/models/Wishlist";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
+import { truncateText } from "@/lib/utils";
+import { diffFields, logAudit } from "@/lib/audit";
+import { checkLowStock, logStockMovements } from "@/lib/stock";
 
 // Fields an admin is allowed to write via this route — excludes computed
 // fields (rating/reviewCount, derived from reviews) and identifiers.
@@ -19,6 +22,7 @@ const ALLOWED_FIELDS = [
   "benefits",
   "usage",
   "stock",
+  "lowStockThreshold",
   "sku",
   "weight",
   "gst",
@@ -27,6 +31,12 @@ const ALLOWED_FIELDS = [
   "isActive",
   "metaTitle",
   "metaDescription",
+] as const;
+
+// What shows up (before → after) in the audit log.
+const AUDITED_FIELDS = [
+  "name", "price", "discountPrice", "stock", "lowStockThreshold",
+  "isActive", "isFeatured", "gst", "category", "sku",
 ] as const;
 
 export async function PUT(
@@ -49,9 +59,57 @@ export async function PUT(
       );
     }
 
+    // Restore an archived product. It comes back inactive so nothing goes
+    // live by accident; the admin re-activates it when ready.
+    if (body.restore === true) {
+      if (!existing.archivedAt) {
+        return NextResponse.json({ error: "Product is not archived" }, { status: 400 });
+      }
+      const restored = await Product.findByIdAndUpdate(
+        id,
+        { $set: { isActive: false }, $unset: { archivedAt: "" } },
+        { new: true }
+      );
+      await logAudit(session, {
+        action: "product.restore",
+        entity: "product",
+        entityId: id,
+        summary: `Restored product "${existing.name}" from the archive (inactive)`,
+      });
+      return NextResponse.json({ message: "Product restored", product: restored });
+    }
+
+    if (existing.archivedAt) {
+      return NextResponse.json(
+        { error: "This product is archived. Restore it before editing." },
+        { status: 400 }
+      );
+    }
+
     const update: Record<string, unknown> = {};
     for (const field of ALLOWED_FIELDS) {
       if (body[field] !== undefined) update[field] = body[field];
+    }
+
+    if (update.stock !== undefined) {
+      const stock = Number(update.stock);
+      if (!Number.isInteger(stock) || stock < 0) {
+        return NextResponse.json({ error: "Stock must be a whole number, 0 or more" }, { status: 400 });
+      }
+      update.stock = stock;
+    }
+    if (update.lowStockThreshold !== undefined) {
+      const t = Number(update.lowStockThreshold);
+      if (!Number.isInteger(t) || t < 0) {
+        return NextResponse.json({ error: "Low-stock alert level must be a whole number, 0 or more" }, { status: 400 });
+      }
+      update.lowStockThreshold = t;
+    }
+
+    // The admin form has no short-description field; keep the derived one in
+    // step with the description so shop cards don't show stale text.
+    if (typeof update.description === "string" && body.shortDescription === undefined) {
+      update.shortDescription = truncateText(update.description.replace(/\s+/g, " ").trim(), 200);
     }
 
     // A "discount" price that's >= the regular price is a markup, not a
@@ -73,6 +131,8 @@ export async function PUT(
       );
     }
 
+    const before = existing.toObject() as unknown as Record<string, unknown>;
+
     const product = await Product.findByIdAndUpdate(
       id,
       { $set: update },
@@ -86,6 +146,36 @@ export async function PUT(
       );
     }
 
+    // Stock history + audit trail
+    const actorName = session.user.name || session.user.email;
+    const changes = diffFields(before, product.toObject() as unknown as Record<string, unknown>, AUDITED_FIELDS);
+
+    if (changes.stock) {
+      await logStockMovements([
+        {
+          product: product._id,
+          delta: product.stock - existing.stock,
+          reason: "admin_edit",
+          actorName,
+          balance: product.stock,
+        },
+      ]);
+    }
+    if (changes.stock || changes.lowStockThreshold) await checkLowStock();
+
+    const changed = Object.entries(changes)
+      .map(([k, [from, to]]) => `${k} ${JSON.stringify(from ?? null)} → ${JSON.stringify(to ?? null)}`)
+      .join(", ");
+    if (changed || Object.keys(update).length > 0) {
+      await logAudit(session, {
+        action: "product.update",
+        entity: "product",
+        entityId: id,
+        summary: `Updated "${product.name}"${changed ? `: ${changed}` : ""}`,
+        meta: { changes },
+      });
+    }
+
     return NextResponse.json({ message: "Product updated", product });
   } catch (error: any) {
     console.error("Admin update product error:", error);
@@ -96,6 +186,11 @@ export async function PUT(
   }
 }
 
+/**
+ * DELETE archives (soft delete): the product disappears from the store and the
+ * default admin list but keeps its reviews, and can be restored. Only an
+ * already-archived product can be removed for good with ?permanent=1.
+ */
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -107,7 +202,7 @@ export async function DELETE(
 
     await connectDB();
 
-    const product = await Product.findByIdAndDelete(id);
+    const product = await Product.findById(id);
     if (!product) {
       return NextResponse.json(
         { error: "Product not found" },
@@ -115,12 +210,46 @@ export async function DELETE(
       );
     }
 
+    const permanent = new URL(req.url).searchParams.get("permanent") === "1";
+
+    if (!permanent) {
+      if (product.archivedAt) {
+        return NextResponse.json({ error: "Product is already archived" }, { status: 400 });
+      }
+      await Product.findByIdAndUpdate(id, { $set: { isActive: false, archivedAt: new Date() } });
+      // Hidden products shouldn't linger in customers' wishlists.
+      await Wishlist.updateMany({ products: id }, { $pull: { products: id } });
+      await logAudit(session, {
+        action: "product.archive",
+        entity: "product",
+        entityId: id,
+        summary: `Archived product "${product.name}"`,
+      });
+      return NextResponse.json({ message: "Product archived", archived: true });
+    }
+
+    if (!product.archivedAt) {
+      return NextResponse.json(
+        { error: "Archive the product first, then delete it permanently." },
+        { status: 400 }
+      );
+    }
+
+    await Product.findByIdAndDelete(id);
+
     // Clean up references so a deleted product doesn't leave dangling
     // wishlist entries (which crashed the wishlist page) or orphaned reviews.
     await Promise.all([
       Wishlist.updateMany({ products: id }, { $pull: { products: id } }),
       Review.deleteMany({ product: id }),
     ]);
+
+    await logAudit(session, {
+      action: "product.delete",
+      entity: "product",
+      entityId: id,
+      summary: `Permanently deleted product "${product.name}"`,
+    });
 
     return NextResponse.json({ message: "Product deleted" });
   } catch (error) {

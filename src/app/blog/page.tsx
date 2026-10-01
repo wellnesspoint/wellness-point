@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import connectDB from "@/lib/db";
 import Blog from "@/models/Blog";
+import { publicBlogFilter } from "@/lib/blog-visibility";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 
 export default async function BlogPage() {
   await connectDB();
-  const posts = await Blog.find({ isPublished: true })
+  const posts = await Blog.find(publicBlogFilter())
     .sort({ createdAt: -1 })
     .select("-content")
     .lean();

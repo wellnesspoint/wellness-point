@@ -5,3 +5,4 @@ node_modules/
 *.tsbuildinfo
 next-env.d.ts
 PROJECT_CONTEXT.md
+CLAUDE.md

@@ -15,7 +15,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
+import { downloadCsv } from "@/lib/csv";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -56,6 +59,9 @@ interface ReportData {
     totalProducts: number;
     avgOrderValue: number;
   };
+  range?: { from: string; to: string; days: number };
+  gstByMonth?: { month: string; orders: number; itemValue: number; taxable: number; gst: number }[];
+  states?: { state: string; orders: number; revenue: number }[];
   statusCounts: Record<string, number>;
   paymentStatusCounts: Record<string, number>;
   comparison: {
@@ -70,18 +76,28 @@ export default function ReportsPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("30");
+  // Custom range (both dates set) overrides the preset period.
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const customRange = !!(from && to);
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reports?period=${period}`);
+      const query = customRange ? `from=${from}&to=${to}` : `period=${period}`;
+      const res = await fetch(`/api/admin/reports?${query}`);
       const json = await res.json();
-      setData(json);
+      if (!res.ok) {
+        toast.error(json.error || "Failed to load reports");
+      } else if (json.dailyRevenue) {
+        // An error response ({ error }) has no report shape and would crash the page.
+        setData(json);
+      }
     } catch (err) {
       console.error("Failed to fetch reports:", err);
     }
     setLoading(false);
-  }, [period]);
+  }, [period, from, to, customRange]);
 
   useEffect(() => {
     fetchReports();
@@ -115,13 +131,7 @@ export default function ReportsPage() {
       data.customerGrowth[i]?.newCustomers?.toString() || "0",
     ]);
 
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `report-${period}days-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
+    downloadCsv(`report-${customRange ? `${from}_to_${to}` : `${period}days`}-${new Date().toISOString().split("T")[0]}.csv`, headers, rows);
   };
 
   if (loading) {
@@ -169,7 +179,17 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={period} onValueChange={setPeriod}>
+          <div className="flex items-center gap-1.5">
+            <Input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="h-10 w-[140px]" aria-label="From date" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="h-10 w-[140px]" aria-label="To date" />
+            {(from || to) && (
+              <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); }}>
+                Clear
+              </Button>
+            )}
+          </div>
+          <Select value={period} onValueChange={(v) => { setPeriod(v); setFrom(""); setTo(""); }}>
             <SelectTrigger className="w-[160px]">
               <Calendar className="h-4 w-4 mr-2" />
               <SelectValue />
@@ -271,7 +291,7 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Revenue (last {period} days)
+                  Revenue ({customRange ? `${from} to ${to}` : `last ${period} days`})
                 </p>
                 <p className="text-2xl font-bold text-foreground mt-1">
                   {formatCurrency(data.comparison.currentRevenue)}
@@ -293,7 +313,7 @@ export default function ReportsPage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              vs previous {period} days:{" "}
+              vs previous {data.range?.days ?? period} days:{" "}
               {formatCurrency(data.comparison.previousRevenue)}
             </p>
           </CardContent>
@@ -303,7 +323,7 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Orders (last {period} days)
+                  Orders ({customRange ? `${from} to ${to}` : `last ${period} days`})
                 </p>
                 <p className="text-2xl font-bold text-foreground mt-1">
                   {data.comparison.currentOrders}
@@ -325,7 +345,7 @@ export default function ReportsPage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              vs previous {period} days: {data.comparison.previousOrders}
+              vs previous {data.range?.days ?? period} days: {data.comparison.previousOrders}
             </p>
           </CardContent>
         </Card>
@@ -557,6 +577,96 @@ export default function ReportsPage() {
           </Card>
         </div>
       </div>
+
+      {/* GST (estimate) by month */}
+      {data.gstByMonth && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">GST summary (estimate)</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={data.gstByMonth.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  `gst-${data.range?.from ?? "report"}_to_${data.range?.to ?? ""}.csv`,
+                  ["Month", "Orders", "Item value (incl. GST)", "Taxable value", "GST"],
+                  data.gstByMonth!.map((g) => [g.month, g.orders, g.itemValue, g.taxable, g.gst])
+                )
+              }
+            >
+              <Download className="mr-1 h-4 w-4" /> CSV
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {data.gstByMonth.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">No paid orders in this range</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="pb-2 font-medium">Month</th>
+                      <th className="pb-2 text-right font-medium">Orders</th>
+                      <th className="pb-2 text-right font-medium">Item value</th>
+                      <th className="pb-2 text-right font-medium">Taxable value</th>
+                      <th className="pb-2 text-right font-medium">GST</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {data.gstByMonth.map((g) => (
+                      <tr key={g.month}>
+                        <td className="py-2">{g.month}</td>
+                        <td className="py-2 text-right">{g.orders}</td>
+                        <td className="py-2 text-right">{formatCurrency(g.itemValue)}</td>
+                        <td className="py-2 text-right">{formatCurrency(g.taxable)}</td>
+                        <td className="py-2 text-right font-semibold">{formatCurrency(g.gst)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Estimate on paid item value only (prices include GST; each product&apos;s own rate, 18% by default). Excludes shipping,
+              discounts and refunds — confirm with your accountant before filing.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sales by state */}
+      {data.states && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Sales by state</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.states.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">No paid orders in this range</p>
+            ) : (
+              <div className="space-y-3">
+                {data.states.map((st) => {
+                  const max = Math.max(...data.states!.map((x) => x.revenue), 1);
+                  return (
+                    <div key={st.state}>
+                      <div className="mb-1 flex justify-between text-sm">
+                        <span className="text-foreground">{st.state}</span>
+                        <span className="text-muted-foreground">
+                          {formatCurrency(st.revenue)} · {st.orders} order{st.orders === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-muted">
+                        <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${(st.revenue / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

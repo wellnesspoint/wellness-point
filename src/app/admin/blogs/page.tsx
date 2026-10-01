@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/admin/ConfirmProvider";
 import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,15 @@ interface Blog {
   images: string[];
   tags: string[];
   isPublished: boolean;
+  publishAt?: string;
   createdAt: string;
+}
+
+// ISO -> value for <input type="datetime-local"> in the browser's timezone
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 const emptyBlog = {
@@ -31,9 +40,11 @@ const emptyBlog = {
   images: [] as string[],
   tags: "",
   isPublished: true,
+  publishAt: "", // datetime-local; empty = publish immediately
 };
 
 export default function AdminBlogsPage() {
+  const confirm = useConfirm();
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -75,13 +86,14 @@ export default function AdminBlogsPage() {
       images: blog.images || [],
       tags: blog.tags.join(", "),
       isPublished: blog.isPublished,
+      publishAt: blog.publishAt ? toLocalInput(blog.publishAt) : "",
     });
     setEditId(blog._id);
     setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this blog post?")) return;
+    if (!(await confirm("Delete this blog post?"))) return;
     try {
       const res = await fetch(`/api/admin/blogs/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
@@ -169,6 +181,8 @@ export default function AdminBlogsPage() {
         .map((s) => s.trim())
         .filter(Boolean),
       isPublished: form.isPublished,
+      // "" clears a schedule on edit
+      publishAt: form.publishAt ? new Date(form.publishAt).toISOString() : "",
     };
 
     setSaving(true);
@@ -353,6 +367,21 @@ export default function AdminBlogsPage() {
                   Published
                 </Label>
               </div>
+              {form.isPublished && (
+                <div>
+                  <Label htmlFor="publishAt">Schedule (optional)</Label>
+                  <Input
+                    id="publishAt"
+                    type="datetime-local"
+                    value={form.publishAt}
+                    onChange={(e) => setForm({ ...form, publishAt: e.target.value })}
+                    className="max-w-xs"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Leave empty to go live now. A future date keeps the post hidden until then.
+                  </p>
+                </div>
+              )}
               <div>
                 <Button type="submit" variant="wellness" disabled={saving}>
                   {saving
@@ -406,7 +435,11 @@ export default function AdminBlogsPage() {
                           : "bg-muted text-muted-foreground"
                         }`}
                     >
-                      {blog.isPublished ? "Published" : "Draft"}
+                      {!blog.isPublished
+                        ? "Draft"
+                        : blog.publishAt && new Date(blog.publishAt) > new Date()
+                          ? `Scheduled ${new Date(blog.publishAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                          : "Published"}
                     </span>
                   </div>
                 </div>

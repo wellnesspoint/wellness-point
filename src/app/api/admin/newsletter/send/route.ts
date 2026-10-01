@@ -1,16 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import connectDB from "@/lib/db";
 import NewsletterSubscriber from "@/models/NewsletterSubscriber";
+import NewsletterCampaign from "@/models/NewsletterCampaign";
 import nodemailer from "nodemailer";
 import { escapeHtml } from "@/lib/utils";
+import { rateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
 
-// Large lists take a while to send — allow the function to run long enough.
+// Large lists take a while to send — allow the background work to run long enough.
 export const maxDuration = 300;
 
 const BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 1000;
+// A campaign still "sending" after this long is treated as dead (function killed).
+const STALE_CAMPAIGN_MS = 30 * 60 * 1000;
 
 function getTransporter() {
   const host = process.env.SMTP_HOST;
@@ -30,7 +35,9 @@ function getTransporter() {
 
 /**
  * POST /api/admin/newsletter/send
- * Sends a newsletter email to all active subscribers.
+ * Starts sending a newsletter to all active subscribers and returns right away
+ * (202). The sending itself continues in the background; progress is recorded on
+ * a NewsletterCampaign document that the admin page polls.
  * Body: { subject: string, body: string }
  */
 export async function POST(req: NextRequest) {
@@ -38,12 +45,27 @@ export async function POST(req: NextRequest) {
     const session = await checkAdmin();
     if (!session) return unauthorizedResponse();
 
-    const { subject, body } = await req.json();
+    const { subject, body } = await req.json().catch(() => ({}));
 
-    if (!subject?.trim() || !body?.trim()) {
+    if (typeof subject !== "string" || typeof body !== "string" || !subject.trim() || !body.trim()) {
       return NextResponse.json(
         { error: "Subject and body are required" },
         { status: 400 }
+      );
+    }
+    if (subject.length > 200 || body.length > 20000) {
+      return NextResponse.json({ error: "Subject (200) or body (20000) is too long" }, { status: 400 });
+    }
+
+    // A double-click or retry would email every subscriber twice.
+    const { success: withinLimit } = await rateLimit("admin-newsletter-send", {
+      limit: 3,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "A newsletter was sent recently. You can send at most 3 per hour." },
+        { status: 429 }
       );
     }
 
@@ -57,6 +79,17 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
+    const running = await NewsletterCampaign.findOne({
+      status: "sending",
+      createdAt: { $gt: new Date(Date.now() - STALE_CAMPAIGN_MS) },
+    }).lean();
+    if (running) {
+      return NextResponse.json(
+        { error: "A newsletter is still being sent. Wait for it to finish." },
+        { status: 409 }
+      );
+    }
+
     const subscribers = await NewsletterSubscriber.find({ isActive: true })
       .select("email")
       .lean();
@@ -68,6 +101,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const campaign = await NewsletterCampaign.create({
+      subject: subject.trim(),
+      body,
+      status: "sending",
+      total: subscribers.length,
+      createdBy: session.user.name || session.user.email,
+    });
+
     const fromAddress =
       process.env.SMTP_FROM_SUPPORT || "Wellness Point <support@wellness-point.in>";
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wellness-point.in";
@@ -76,10 +117,7 @@ export async function POST(req: NextRequest) {
     const safeSubject = escapeHtml(subject.trim());
     const safeBody = escapeHtml(body).replace(/\r?\n/g, "<br />");
 
-    let sent = 0;
-    let failed = 0;
-
-    const sendTo = async (email: string) => {
+    const sendTo = async (email: string): Promise<boolean> => {
       const unsubscribeUrl = buildUnsubscribeUrl(baseUrl, email);
 
       const html = `
@@ -107,29 +145,60 @@ export async function POST(req: NextRequest) {
           html,
           headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` },
         });
-        sent++;
+        return true;
       } catch (err) {
         console.error(`Failed to send to ${email}:`, err);
-        failed++;
+        return false;
       }
     };
 
-    // Small concurrent batches with a pause between them, to stay under SMTP
-    // rate limits without sending one-by-one (which times out on big lists).
-    for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
-      const batch = subscribers.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map((sub) => sendTo(sub.email)));
-      if (i + BATCH_SIZE < subscribers.length) {
-        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
-      }
-    }
+    const campaignId = campaign._id;
 
-    return NextResponse.json({
-      message: `Newsletter sent! ${sent} delivered, ${failed} failed.`,
-      sent,
-      failed,
-      total: subscribers.length,
+    // Runs after the response is sent; the platform keeps the function alive for it.
+    after(async () => {
+      let sent = 0;
+      let failed = 0;
+      try {
+        // Small concurrent batches with a pause between them, to stay under SMTP rate limits.
+        for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
+          const batch = subscribers.slice(i, i + BATCH_SIZE);
+          const results = await Promise.all(batch.map((sub) => sendTo(sub.email)));
+          const ok = results.filter(Boolean).length;
+          sent += ok;
+          failed += results.length - ok;
+          await NewsletterCampaign.updateOne({ _id: campaignId }, { $set: { sent, failed } });
+          if (i + BATCH_SIZE < subscribers.length) {
+            await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+          }
+        }
+        await NewsletterCampaign.updateOne(
+          { _id: campaignId },
+          { $set: { status: sent === 0 ? "failed" : "done", sent, failed, finishedAt: new Date() } }
+        );
+      } catch (err) {
+        console.error("Newsletter background send crashed:", err);
+        await NewsletterCampaign.updateOne(
+          { _id: campaignId },
+          { $set: { status: "failed", sent, failed, finishedAt: new Date() } }
+        ).catch(() => {});
+      }
     });
+
+    await logAudit(session, {
+      action: "newsletter.send",
+      entity: "newsletter",
+      entityId: campaignId.toString(),
+      summary: `Started sending "${subject.trim().slice(0, 100)}" to ${subscribers.length} subscribers`,
+    });
+
+    return NextResponse.json(
+      {
+        message: `Sending to ${subscribers.length} subscriber${subscribers.length === 1 ? "" : "s"} in the background.`,
+        campaignId,
+        total: subscribers.length,
+      },
+      { status: 202 }
+    );
   } catch (error) {
     console.error("Newsletter send error:", error);
     return NextResponse.json(

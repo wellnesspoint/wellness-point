@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/admin/ConfirmProvider";
 import { useEffect, useState, useCallback } from "react";
 import {
   MessageSquare,
@@ -21,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
+import { CONTACT_REPLIES, fillReply } from "@/lib/canned-replies";
 
 interface Contact {
   _id: string;
@@ -36,6 +38,7 @@ interface Contact {
 }
 
 export default function ContactsPage() {
+  const confirm = useConfirm();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Contact | null>(null);
@@ -129,7 +132,7 @@ export default function ContactsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this query permanently?")) return;
+    if (!(await confirm("Delete this query permanently?"))) return;
     try {
       await fetch(`/api/admin/contacts/${id}`, { method: "DELETE" });
       setContacts((prev) => prev.filter((c) => c._id !== id));
@@ -300,6 +303,20 @@ export default function ContactsPage() {
                 <Send className="h-4 w-4" />
                 Write Reply
               </h3>
+              <select
+                value=""
+                onChange={(e) => {
+                  const t = CONTACT_REPLIES.find((r) => r.label === e.target.value);
+                  if (t) setReplyText(fillReply(t.text, selected.name));
+                }}
+                className="mb-2 w-full rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground sm:w-auto"
+                aria-label="Insert a saved reply"
+              >
+                <option value="">Insert a saved reply…</option>
+                {CONTACT_REPLIES.map((r) => (
+                  <option key={r.label} value={r.label}>{r.label}</option>
+                ))}
+              </select>
               <Textarea
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}

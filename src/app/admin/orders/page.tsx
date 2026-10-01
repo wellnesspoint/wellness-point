@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useConfirm } from "@/components/admin/ConfirmProvider";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +21,19 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
+import Pagination, { useDebounced } from "@/components/admin/Pagination";
+import { calcOrderTotal } from "@/lib/order-math";
+import { downloadCsv } from "@/lib/csv";
+import type { CompanyInfo } from "@/lib/invoice-core";
+import {
+  ORDER_STATUSES,
+  ORDER_STATUS_TRANSITIONS,
+  PAYMENT_STATUSES,
+  PAYMENT_STATUS_TRANSITIONS,
+  allowedNext,
+  type OrderStatus,
+  type PaymentStatus,
+} from "@/lib/order-status";
 
 interface OrderItem {
   product: string;
@@ -51,13 +65,24 @@ interface Order {
   orderStatus: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
+  couponCode?: string;
+  tracking?: { courier?: string; trackingNumber?: string; trackingUrl?: string };
+  statusHistory?: { field: string; from?: string; to: string; by?: string; at: string }[];
+  internalNotes?: { text: string; by?: string; at: string }[];
+  refunds?: { amount: number; reason?: string; by?: string; at: string }[];
+  refundedAmount?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-const orderStatusOptions = ["processing", "confirmed", "shipped", "delivered", "cancelled"];
-const paymentStatusOptions = ["pending", "paid", "failed", "refunded"];
+const orderStatusOptions: string[] = ORDER_STATUSES;
+
+// Only legal next states are selectable (the API enforces the same rules).
+const nextOrderStatuses = (current: string) =>
+  allowedNext(ORDER_STATUS_TRANSITIONS, current as OrderStatus, ORDER_STATUSES);
+const nextPaymentStatuses = (current: string) =>
+  allowedNext(PAYMENT_STATUS_TRANSITIONS, current as PaymentStatus, PAYMENT_STATUSES);
 
 const statusColor: Record<string, string> = {
   processing: "bg-blue-100 text-blue-700",
@@ -79,42 +104,15 @@ const statusIcon: Record<string, any> = {
   cancelled: XCircle,
 };
 
-// Format number with commas (ASCII-safe, no Unicode)
-function fmt(n: number): string {
-  const s = Math.abs(n).toFixed(2);
-  const [intPart, dec] = s.split(".");
-  // Indian numbering: last 3 digits, then groups of 2
-  if (intPart.length <= 3) return (n < 0 ? "-" : "") + intPart + (dec !== "00" ? "." + dec : "");
-  const last3 = intPart.slice(-3);
-  let rest = intPart.slice(0, -3);
-  const parts: string[] = [];
-  while (rest.length > 2) {
-    parts.unshift(rest.slice(-2));
-    rest = rest.slice(0, -2);
-  }
-  if (rest) parts.unshift(rest);
-  return (n < 0 ? "-" : "") + parts.join(",") + "," + last3 + (dec !== "00" ? "." + dec : "");
-}
+// ——— Invoice PDF (layout shared with the emailed invoice: lib/invoice-core) ———
+async function downloadInvoices(list: Order[]) {
+  if (list.length === 0) return;
+  const [{ jsPDF }, { renderInvoice }] = await Promise.all([
+    import("jspdf"),
+    import("@/lib/invoice-core"),
+  ]);
 
-// ——— Invoice PDF Generation ———
-async function downloadInvoice(order: Order) {
-  const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const W = doc.internal.pageSize.getWidth(); // 210mm
-  const H = doc.internal.pageSize.getHeight(); // 297mm
-  const M = 15; // margin
-  const orderId = order._id.slice(-8).toUpperCase();
-  const invoiceNo = `WP-${orderId}`;
-  const orderDate = new Date(order.createdAt).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
-  // ---------- TOP HALF: INVOICE ----------
-  let y = 18;
-
-  // Load logo as base64
+  // Load logo as base64 (skipped if it fails)
   let logoBase64: string | null = null;
   try {
     const img = new Image();
@@ -127,299 +125,144 @@ async function downloadInvoice(order: Order) {
     const canvas = document.createElement("canvas");
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext("2d");
-    ctx?.drawImage(img, 0, 0);
+    canvas.getContext("2d")?.drawImage(img, 0, 0);
     logoBase64 = canvas.toDataURL("image/png");
   } catch {
-    // If logo fails to load, skip it
+    // no logo
   }
 
-  // Company header with logo
-  const logoSize = 16; // mm - bigger to match heading
-  const textStartX = logoBase64 ? M + logoSize + 3 : M;
-  if (logoBase64) {
-    doc.addImage(logoBase64, "PNG", M, y - 6, logoSize, logoSize);
+  // Store name / GSTIN / address come from Admin → Settings (falls back to defaults).
+  let company: CompanyInfo | undefined;
+  try {
+    const res = await fetch("/api/admin/settings");
+    if (res.ok) company = (await res.json()).settings;
+  } catch {
+    // use defaults
   }
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.text("Wellness Point", textStartX, y);
-  y += 6;
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100);
-  doc.text("Premium Food Supplements for Whole-Body Wellness", textStartX, y);
-  y += 4;
-  doc.text("Bengaluru, Karnataka, India", textStartX, y);
-  y += 4;
-  doc.text("GST No: 29ACQPH3825A1ZP", textStartX, y);
 
-  // "TAX INVOICE" label on right (aligned with company name)
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(34, 120, 65);
-  doc.text("TAX INVOICE", W - M, 18, { align: "right" });
-
-  // Invoice meta on right (tight below TAX INVOICE, no gap)
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80);
-  doc.text(`Invoice No: ${invoiceNo}`, W - M, 24, { align: "right" });
-  doc.text(`Order ID: #${orderId}`, W - M, 28, { align: "right" });
-  doc.text(`Date: ${orderDate}`, W - M, 32, { align: "right" });
-  doc.text(`Payment: Razorpay (${order.paymentStatus.toUpperCase()})`, W - M, 36, { align: "right" });
-
-  y += 6;
-  // Divider below header
-  doc.setDrawColor(200);
-  doc.line(M, y, W - M, y);
-  y += 6;
-
-  // Bill To section
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(80);
-  doc.text("BILL TO:", M, y);
-  y += 5;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30);
-  doc.text(order.shippingAddress?.fullName || order.user?.name || "Customer", M, y);
-  y += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(80);
-  if (order.shippingAddress?.phone) {
-    doc.text(`Phone: ${order.shippingAddress.phone}`, M, y);
-    y += 4;
-  }
-  const invoiceEmail = order.shippingAddress?.email || order.user?.email;
-  if (invoiceEmail) {
-    doc.text(`Email: ${invoiceEmail}`, M, y);
-    y += 4;
-  }
-  doc.text(
-    `${[order.shippingAddress?.street, order.shippingAddress?.addressLine2].filter(Boolean).join(", ")}, ${order.shippingAddress?.city || ""}, ${order.shippingAddress?.state || ""} - ${order.shippingAddress?.pincode || ""}`,
-    M,
-    y
-  );
-  y += 8;
-
-  // Items table header
-  doc.setFillColor(240, 240, 240);
-  doc.rect(M, y - 1, W - 2 * M, 7, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(60);
-  doc.text("#", M + 2, y + 3.5);
-  doc.text("Product", M + 10, y + 3.5);
-  doc.text("Qty", W - M - 60, y + 3.5, { align: "center" });
-  doc.text("Unit Price", W - M - 35, y + 3.5, { align: "right" });
-  doc.text("Amount", W - M - 2, y + 3.5, { align: "right" });
-  y += 10;
-
-  // Items rows
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(30);
-  order.items.forEach((item, i) => {
-    doc.setFontSize(8);
-    doc.text(String(i + 1), M + 2, y);
-    // Truncate long names
-    const nameText = item.name.length > 40 ? item.name.substring(0, 37) + "..." : item.name;
-    doc.text(nameText, M + 10, y);
-    doc.text(String(item.quantity), W - M - 60, y, { align: "center" });
-    doc.text(`Rs. ${fmt(item.price)}`, W - M - 35, y, { align: "right" });
-    doc.text(`Rs. ${fmt(item.price * item.quantity)}`, W - M - 2, y, { align: "right" });
-    y += 6;
+  // One page per order (invoice on top, shipping label below).
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  list.forEach((order, i) => {
+    if (i > 0) doc.addPage();
+    renderInvoice(
+      doc,
+      {
+        ...order,
+        email: order.shippingAddress?.email || order.user?.email,
+        userName: order.user?.name,
+      },
+      { logoBase64, includeShippingLabel: true, company }
+    );
   });
 
-  // Divider
-  y += 2;
-  doc.setDrawColor(200);
-  doc.line(W - M - 80, y, W - M, y);
-  y += 6;
-
-  // Summary — calculate from actual items so numbers always add up
-  const calcSubtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const calcTotal = calcSubtotal + (order.shipping || 0) - (order.discount || 0);
-
-  doc.setFontSize(8);
-  doc.setTextColor(80);
-  doc.text("Subtotal:", W - M - 80, y);
-  doc.setTextColor(30);
-  doc.text(`Rs. ${fmt(calcSubtotal)}`, W - M - 2, y, { align: "right" });
-  y += 5;
-
-  doc.setTextColor(80);
-  doc.text("Shipping:", W - M - 80, y);
-  doc.setTextColor(30);
-  doc.text(`Rs. ${fmt(order.shipping || 0)}`, W - M - 2, y, { align: "right" });
-  y += 5;
-
-  if (order.discount > 0) {
-    doc.setTextColor(80);
-    doc.text("Discount:", W - M - 80, y);
-    doc.setTextColor(22, 163, 74);
-    doc.text(`-Rs. ${fmt(order.discount)}`, W - M - 2, y, { align: "right" });
-    y += 5;
-  }
-
-  // Total
-  doc.setDrawColor(200);
-  doc.line(W - M - 80, y, W - M, y);
-  y += 6;
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(34, 120, 65);
-  doc.text("TOTAL:", W - M - 80, y);
-  doc.text(`Rs. ${fmt(calcTotal)}`, W - M - 2, y, { align: "right" });
-  y += 8;
-
-  // GST note
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "italic");
-  doc.setTextColor(120);
-  doc.text("* All prices are inclusive of applicable GST.", M, y);
-  y += 3;
-  doc.text("* This is a computer-generated invoice and does not require a signature.", M, y);
-
-  // ============================
-  // DASHED CUT LINE AT MIDPOINT
-  // ============================
-  const cutY = H / 2;
-  doc.setDrawColor(150);
-  doc.setLineDashPattern([3, 3], 0);
-  doc.line(M, cutY, W - M, cutY);
-
-  // Scissors icon / text at cut line
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(150);
-  doc.text("--- CUT HERE --- Keep above with product, paste below on delivery box ---", M + 5, cutY - 2);
-  doc.setLineDashPattern([], 0); // reset
-
-  // ---------- BOTTOM HALF: SHIPPING LABEL ----------
-  let sy = cutY + 15;
-
-  // "SHIPPING LABEL" header
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(34, 120, 65);
-  doc.text("SHIPPING LABEL", W / 2, sy, { align: "center" });
-  sy += 10;
-
-  // From
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(80);
-  doc.text("FROM:", M, sy);
-  sy += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(30);
-  doc.text("Wellness Point", M, sy);
-  sy += 4;
-  doc.setFontSize(8);
-  doc.setTextColor(80);
-  doc.text("Bengaluru, Karnataka, India", M, sy);
-  sy += 4;
-  doc.text("GST No: 29ACQPH3825A1ZP", M, sy);
-  sy += 6;
-
-  // To (no divider, closer to FROM)
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(80);
-  doc.text("TO:", M, sy);
-  sy += 6;
-
-  // Big recipient name
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30);
-  doc.text(order.shippingAddress?.fullName || "Customer", M, sy);
-  sy += 7;
-
-  // Address
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(50);
-  if (order.shippingAddress?.street) {
-    doc.text(order.shippingAddress.street, M, sy);
-    sy += 6;
-  }
-  if (order.shippingAddress?.addressLine2) {
-    doc.text(order.shippingAddress.addressLine2, M, sy);
-    sy += 6;
-  }
-  doc.text(
-    `${order.shippingAddress?.city || ""}, ${order.shippingAddress?.state || ""}`,
-    M,
-    sy
-  );
-  sy += 6;
-
-  // Big pincode
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30);
-  doc.text(`PIN: ${order.shippingAddress?.pincode || ""}`, M, sy);
-  sy += 8;
-
-  // Phone
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(50);
-  doc.text(`Phone: ${order.shippingAddress?.phone || ""}`, M, sy);
-  sy += 10;
-
-  // Order reference box
-  doc.setDrawColor(200);
-  doc.setFillColor(245, 245, 245);
-  doc.roundedRect(M, sy, W - 2 * M, 14, 2, 2, "FD");
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(60);
-  doc.text(`Order: #${orderId}`, M + 5, sy + 6);
-  doc.text(`Date: ${orderDate}`, W / 2, sy + 6);
-  doc.text(`Items: ${order.items.length}`, W - M - 30, sy + 6);
-  doc.text(`Total: Rs. ${fmt(calcTotal)}`, W / 2, sy + 11);
-
   // Save with data URI to ensure Chrome uses correct filename
-  const fileName = `Invoice-${invoiceNo}.pdf`;
-  const pdfDataUri = doc.output("datauristring");
   const link = document.createElement("a");
-  link.href = pdfDataUri;
-  link.download = fileName;
+  link.href = doc.output("datauristring");
+  link.download =
+    list.length === 1
+      ? `Invoice-WP-${list[0]._id.slice(-8).toUpperCase()}.pdf`
+      : `Invoices-${list.length}-orders-${new Date().toISOString().slice(0, 10)}.pdf`;
   link.click();
-  toast.success("Invoice downloaded");
+  toast.success(list.length === 1 ? "Invoice downloaded" : `${list.length} invoices downloaded`);
 }
 
+const downloadInvoice = (order: Order) => downloadInvoices([order]);
+
+const PAGE_SIZE = 25;
+
 export default function AdminOrdersPage() {
+  const confirm = useConfirm();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [page, setPage] = useState(1);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const requestId = useRef(0);
 
-  const fetchOrders = (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    fetch("/api/admin/orders")
-      .then((r) => r.json())
-      .then((d) => setOrders(d.orders || []))
-      .catch(() => { })
-      .finally(() => {
-        setLoading(false);
-        setRefreshing(false);
-      });
-  };
+  // Bulk selection (list view)
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Internal notes + partial refund (detail view)
+  const [noteText, setNoteText] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
+  const [refunding, setRefunding] = useState(false);
+
+  // Shipping & tracking form (order detail view)
+  const [trackingForm, setTrackingForm] = useState({ courier: "", trackingNumber: "", trackingUrl: "" });
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
+  const [savingTracking, setSavingTracking] = useState(false);
+  const selectedId = selectedOrder?._id;
+  useEffect(() => {
+    setTrackingForm({
+      courier: selectedOrder?.tracking?.courier || "",
+      trackingNumber: selectedOrder?.tracking?.trackingNumber || "",
+      trackingUrl: selectedOrder?.tracking?.trackingUrl || "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  const buildQuery = useCallback(
+    (extra: Record<string, string> = {}) => {
+      const params = new URLSearchParams({ status: filterStatus, ...extra });
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      return params;
+    },
+    [filterStatus, debouncedSearch]
+  );
+
+  const fetchOrders = useCallback(async () => {
+    const id = ++requestId.current;
+    setFetching(true);
+    try {
+      const res = await fetch(
+        `/api/admin/orders?${buildQuery({ page: String(page), limit: String(PAGE_SIZE) })}`
+      );
+      const d = await res.json();
+      if (id !== requestId.current) return; // a newer request superseded this one
+      if (!res.ok) throw new Error(d.error || "Failed to load orders");
+      setOrders(d.orders || []);
+      setTotal(d.total || 0);
+      setPages(d.pages || 1);
+      setStatusCounts(d.statusCounts || {});
+    } catch (err) {
+      if (id === requestId.current) {
+        toast.error(err instanceof Error ? err.message : "Failed to load orders");
+      }
+    } finally {
+      if (id === requestId.current) {
+        setFetching(false);
+        setInitialLoading(false);
+      }
+    }
+  }, [buildQuery, page]);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   const updateOrderStatus = async (orderId: string, field: string, value: string) => {
+    if (field === "paymentStatus" && value === "refunded") {
+      if (
+        !(await confirm(
+          "The remaining amount will be returned to the customer via Razorpay and stock will be restored. This cannot be undone.",
+          { title: "Refund this order?", confirmLabel: "Refund" }
+        ))
+      )
+        return;
+    } else if (field === "orderStatus" && value === "cancelled") {
+      if (!(await confirm("Cancel this order? Stock will be restored. This cannot be undone."))) return;
+    }
+
     setUpdating(orderId);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
@@ -427,58 +270,196 @@ export default function AdminOrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Failed to update order");
+      }
+      const data = await res.json().catch(() => ({}));
       setOrders((prev) =>
         prev.map((o) => (o._id === orderId ? { ...o, [field]: value } : o))
       );
       if (selectedOrder?._id === orderId) {
-        setSelectedOrder((prev) => prev ? { ...prev, [field]: value } : null);
+        setSelectedOrder((prev) =>
+          prev ? { ...prev, [field]: value, statusHistory: data.order?.statusHistory ?? prev.statusHistory } : null
+        );
       }
-      toast.success(`Order ${field === "orderStatus" ? "status" : "payment"} updated`);
-    } catch {
-      toast.error("Failed to update order");
+      fetchOrders(); // refresh tab counts / filtered rows
+      toast.success(
+        (field === "paymentStatus" && value === "refunded"
+          ? "Order refunded via Razorpay"
+          : `Order ${field === "orderStatus" ? "status" : "payment"} updated`) +
+          (data.emailed ? " · customer emailed" : "")
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update order");
     } finally {
       setUpdating(null);
     }
   };
 
-  const downloadCSV = () => {
-    const headers = ["Order ID", "Customer", "Email", "Items", "Total", "Payment", "Status", "Date"];
-    const rows = filtered.map((o) => [
-      o._id,
-      o.user?.name || o.shippingAddress?.fullName || "",
-      o.user?.email || "",
-      o.items.length,
-      o.items.reduce((s: number, item: any) => s + item.price * item.quantity, 0) + (o.shipping || 0) - (o.discount || 0),
-      o.paymentStatus,
-      o.orderStatus,
-      new Date(o.createdAt).toLocaleDateString("en-IN"),
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV downloaded");
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const allOnPageSelected = orders.length > 0 && orders.every((o) => selected.has(o._id));
+  const toggleSelectAll = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) orders.forEach((o) => next.delete(o._id));
+      else orders.forEach((o) => next.add(o._id));
+      return next;
+    });
+
+  const selectedOrders = orders.filter((o) => selected.has(o._id));
+
+  // A selection only makes sense for the rows currently shown.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [page, filterStatus, debouncedSearch]);
+
+  const bulkUpdate = async (target: "confirmed" | "shipped" | "delivered") => {
+    const ids = selectedOrders.map((o) => o._id);
+    if (ids.length === 0) return;
+    if (
+      !(await confirm(
+        `Mark ${ids.length} order${ids.length > 1 ? "s" : ""} as ${target}? Only paid orders that can legally move to "${target}" are changed${
+          target !== "confirmed" ? "; customers are emailed" : ""
+        }.`,
+        { danger: false, confirmLabel: `Mark ${target}`, title: `Mark as ${target}` }
+      ))
+    )
+      return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/orders/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, orderStatus: target }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Bulk update failed");
+      toast.success(
+        `${d.updated.length} updated${d.skipped.length ? `, ${d.skipped.length} skipped` : ""}${d.emailed ? ` · ${d.emailed} emailed` : ""}`
+      );
+      if (d.skipped.length) {
+        toast(`Skipped: ${d.skipped.slice(0, 3).map((x: { id: string; reason: string }) => `#${x.id.slice(-8).toUpperCase()} (${x.reason})`).join(", ")}${d.skipped.length > 3 ? "…" : ""}`, { duration: 7000 });
+      }
+      setSelected(new Set());
+      fetchOrders();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bulk update failed");
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
-  const filtered = orders
-    .filter((o) =>
-      filterStatus === "all" ? true : o.orderStatus === filterStatus
-    )
-    .filter(
-      (o) =>
-        o._id.toLowerCase().includes(search.toLowerCase()) ||
-        o.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        o.shippingAddress?.email?.toLowerCase().includes(search.toLowerCase()) ||
-        o.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
-        o.shippingAddress?.fullName?.toLowerCase().includes(search.toLowerCase())
-    );
+  const addNote = async () => {
+    if (!selectedOrder || !noteText.trim()) return;
+    setAddingNote(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${selectedOrder._id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: noteText.trim() }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Failed to add note");
+      setSelectedOrder((prev) => (prev ? { ...prev, internalNotes: d.internalNotes } : null));
+      setNoteText("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add note");
+    } finally {
+      setAddingNote(false);
+    }
+  };
 
-  if (loading) {
+  const partialRefund = async () => {
+    if (!selectedOrder) return;
+    const amount = Number(refundAmount);
+    if (!Number.isFinite(amount) || amount < 1) {
+      toast.error("Enter an amount of at least ₹1");
+      return;
+    }
+    if (
+      !(await confirm(`Refund ₹${amount.toLocaleString("en-IN")} to the customer via Razorpay? Stock is not restored.`, {
+        title: "Partial refund",
+        confirmLabel: `Refund ₹${amount.toLocaleString("en-IN")}`,
+      }))
+    )
+      return;
+    setRefunding(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${selectedOrder._id}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, reason: refundReason }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Refund failed");
+      setSelectedOrder((prev) => (prev ? { ...prev, refunds: d.refunds, refundedAmount: d.refundedAmount } : null));
+      setRefundAmount("");
+      setRefundReason("");
+      fetchOrders();
+      toast.success(`₹${amount.toLocaleString("en-IN")} refunded${d.emailed ? " · customer emailed" : ""}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Refund failed");
+    } finally {
+      setRefunding(false);
+    }
+  };
+
+  const saveTracking = async () => {
+    if (!selectedOrder) return;
+    setSavingTracking(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${selectedOrder._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tracking: trackingForm, notify: notifyCustomer }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to save tracking");
+      setSelectedOrder((prev) =>
+        prev ? { ...prev, tracking: data.order?.tracking ?? trackingForm, statusHistory: data.order?.statusHistory ?? prev.statusHistory } : null
+      );
+      toast.success("Tracking saved" + (data.emailed ? " · customer emailed" : ""));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save tracking");
+    } finally {
+      setSavingTracking(false);
+    }
+  };
+
+  const downloadCSV = async () => {
+    try {
+      // Export everything matching the current filters, not just this page.
+      const res = await fetch(`/api/admin/orders?${buildQuery({ all: "1" })}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Export failed");
+      const headers = ["Order ID", "Customer", "Email", "Items", "Total", "Payment", "Status", "Date"];
+      const rows = (d.orders as Order[]).map((o) => [
+        o._id,
+        o.user?.name || o.shippingAddress?.fullName || "",
+        o.shippingAddress?.email || o.user?.email || "",
+        o.items.length,
+        calcOrderTotal(o),
+        o.paymentStatus,
+        o.orderStatus,
+        new Date(o.createdAt).toLocaleDateString("en-IN"),
+      ]);
+      downloadCsv(`orders-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+      toast.success(
+        d.total > rows.length ? `CSV downloaded (first ${rows.length} of ${d.total})` : "CSV downloaded"
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export failed");
+    }
+  };
+
+  if (initialLoading) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">Orders</h1>
@@ -569,7 +550,7 @@ export default function AdminOrdersPage() {
                 )}
                 <div className="flex justify-between border-t pt-2 text-base font-bold">
                   <span>Total</span>
-                  <span className="text-emerald-600">₹{(o.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (o.shipping || 0) - (o.discount || 0)).toLocaleString("en-IN")}</span>
+                  <span className="text-emerald-600">₹{calcOrderTotal(o).toLocaleString("en-IN")}</span>
                 </div>
               </div>
             </CardContent>
@@ -591,7 +572,7 @@ export default function AdminOrdersPage() {
                     disabled={updating === o._id}
                     className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
                   >
-                    {orderStatusOptions.map((s) => (
+                    {nextOrderStatuses(o.orderStatus).map((s) => (
                       <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                     ))}
                   </select>
@@ -604,7 +585,7 @@ export default function AdminOrdersPage() {
                     disabled={updating === o._id}
                     className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
                   >
-                    {paymentStatusOptions.map((s) => (
+                    {nextPaymentStatuses(o.paymentStatus).map((s) => (
                       <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                     ))}
                   </select>
@@ -645,6 +626,54 @@ export default function AdminOrdersPage() {
               </CardContent>
             </Card>
 
+            {/* Shipping & Tracking */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Shipping &amp; Tracking</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Courier</label>
+                  <Input
+                    value={trackingForm.courier}
+                    onChange={(e) => setTrackingForm({ ...trackingForm, courier: e.target.value })}
+                    placeholder="e.g. DTDC, Delhivery"
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Tracking number</label>
+                  <Input
+                    value={trackingForm.trackingNumber}
+                    onChange={(e) => setTrackingForm({ ...trackingForm, trackingNumber: e.target.value })}
+                    maxLength={80}
+                    className="font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Tracking link (https)</label>
+                  <Input
+                    value={trackingForm.trackingUrl}
+                    onChange={(e) => setTrackingForm({ ...trackingForm, trackingUrl: e.target.value })}
+                    placeholder="https://..."
+                    maxLength={500}
+                  />
+                </div>
+                {o.orderStatus === "shipped" && (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" checked={notifyCustomer} onChange={(e) => setNotifyCustomer(e.target.checked)} />
+                    Email the customer if the tracking details changed
+                  </label>
+                )}
+                <Button size="sm" variant="outline" onClick={saveTracking} disabled={savingTracking} className="w-full">
+                  {savingTracking ? "Saving..." : "Save tracking"}
+                </Button>
+                <p className="text-[11px] text-muted-foreground">
+                  Tip: save tracking first, then mark the order Shipped — the customer&apos;s shipped email will include it.
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Customer & Shipping */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-2">
@@ -663,6 +692,92 @@ export default function AdminOrdersPage() {
                 {o.user && (
                   <p className="text-muted-foreground mt-2">Email: {o.user.email}</p>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Refunds */}
+            {(o.paymentStatus === "paid" || (o.refunds && o.refunds.length > 0)) && (
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Partial refund</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {o.refunds && o.refunds.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {o.refunds.map((r, i) => (
+                        <li key={i} className="rounded bg-orange-50 px-2 py-1.5 text-xs">
+                          <span className="font-semibold text-orange-700">₹{r.amount.toLocaleString("en-IN")}</span>
+                          {r.reason ? ` · ${r.reason}` : ""}
+                          <span className="block text-[11px] text-muted-foreground">
+                            {r.by ? `by ${r.by} · ` : ""}
+                            {new Date(r.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {o.paymentStatus === "paid" && (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Refundable now: ₹
+                        {(calcOrderTotal(o) - (o.refundedAmount || 0)).toLocaleString("en-IN")}. To refund the rest and restore stock,
+                        set Payment status → Refunded.
+                      </p>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        placeholder="Amount (₹)"
+                      />
+                      <Input
+                        value={refundReason}
+                        onChange={(e) => setRefundReason(e.target.value)}
+                        placeholder="Reason (optional)"
+                        maxLength={200}
+                      />
+                      <Button size="sm" variant="outline" onClick={partialRefund} disabled={refunding || !refundAmount} className="w-full">
+                        {refunding ? "Refunding..." : "Refund this amount"}
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Internal notes */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Internal notes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {o.internalNotes && o.internalNotes.length > 0 ? (
+                  <ul className="space-y-2">
+                    {o.internalNotes.map((n, i) => (
+                      <li key={i} className="rounded bg-muted/60 px-2.5 py-2 text-xs">
+                        <p className="whitespace-pre-wrap break-words">{n.text}</p>
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          {n.by ? `${n.by} · ` : ""}
+                          {new Date(n.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No notes yet. Only admins can see these.</p>
+                )}
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Add a note…"
+                  rows={2}
+                  maxLength={1000}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                />
+                <Button size="sm" variant="outline" onClick={addNote} disabled={addingNote || !noteText.trim()} className="w-full">
+                  {addingNote ? "Adding..." : "Add note"}
+                </Button>
               </CardContent>
             </Card>
 
@@ -690,6 +805,29 @@ export default function AdminOrdersPage() {
                     <span className="font-mono text-xs">{o.razorpayOrderId}</span>
                   </div>
                 )}
+                {o.couponCode && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Coupon</span>
+                    <span className="font-mono text-xs">{o.couponCode}</span>
+                  </div>
+                )}
+                {o.statusHistory && o.statusHistory.length > 0 && (
+                  <div className="mt-3 border-t pt-3">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">Status history</p>
+                    <ul className="space-y-1.5">
+                      {[...o.statusHistory].reverse().map((h, i) => (
+                        <li key={i} className="text-xs">
+                          <span className="font-medium capitalize">{h.field === "orderStatus" ? "Order" : "Payment"}</span>{" "}
+                          {h.from} → <span className="font-medium">{h.to}</span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            {h.by ? `by ${h.by} · ` : ""}
+                            {new Date(h.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {o.notes && (
                   <div className="mt-2">
                     <span className="text-muted-foreground">Notes:</span>
@@ -708,7 +846,7 @@ export default function AdminOrdersPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-foreground">
-          Orders ({orders.length})
+          Orders ({total})
         </h1>
         <div className="flex gap-2">
           <div className="relative flex-1 sm:w-64">
@@ -716,18 +854,21 @@ export default function AdminOrdersPage() {
             <Input
               placeholder="Search by ID or user..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="pl-9"
             />
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => fetchOrders(true)}
-            disabled={refreshing}
+            onClick={() => fetchOrders()}
+            disabled={fetching}
             title="Refresh"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
           </Button>
           <Button variant="outline" size="sm" onClick={downloadCSV} title="Download CSV">
             <Download className="h-4 w-4" />
@@ -740,23 +881,22 @@ export default function AdminOrdersPage() {
         {["all", ...orderStatusOptions].map((s) => (
           <button
             key={s}
-            onClick={() => setFilterStatus(s)}
+            onClick={() => {
+              setFilterStatus(s);
+              setPage(1);
+            }}
             className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${filterStatus === s
               ? "bg-emerald-600 text-white"
               : "bg-muted text-muted-foreground hover:bg-slate-200"
               }`}
           >
             {s.charAt(0).toUpperCase() + s.slice(1)}
-            {s !== "all" && (
-              <span className="ml-1 opacity-70">
-                ({orders.filter((o) => o.orderStatus === s).length})
-              </span>
-            )}
+            <span className="ml-1 opacity-70">({statusCounts[s] ?? 0})</span>
           </button>
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {orders.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="py-12 text-center">
             <ShoppingBag className="mx-auto mb-3 h-14 w-14 text-muted" />
@@ -764,10 +904,44 @@ export default function AdminOrdersPage() {
           </CardContent>
         </Card>
       ) : (
+        <div className="space-y-3">
+        {selectedOrders.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-emerald-800">
+              {selectedOrders.length} order{selectedOrders.length > 1 ? "s" : ""} selected
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkUpdate("confirmed")}>
+                Mark confirmed
+              </Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkUpdate("shipped")}>
+                Mark shipped
+              </Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkUpdate("delivered")}>
+                Mark delivered
+              </Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => downloadInvoices(selectedOrders)}>
+                <FileText className="mr-1 h-4 w-4" /> Print invoices &amp; labels
+              </Button>
+              <Button size="sm" variant="ghost" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
+                <th className="w-8 pb-3">
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    onChange={toggleSelectAll}
+                    aria-label="Select all orders on this page"
+                    className="h-4 w-4 rounded"
+                  />
+                </th>
                 <th className="pb-3 font-medium">Order ID</th>
                 <th className="pb-3 font-medium">Customer</th>
                 <th className="pb-3 font-medium">Items</th>
@@ -779,8 +953,17 @@ export default function AdminOrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((order) => (
-                <tr key={order._id} className="hover:bg-slate-50">
+              {orders.map((order) => (
+                <tr key={order._id} className={`hover:bg-slate-50 ${selected.has(order._id) ? "bg-emerald-50/50" : ""}`}>
+                  <td className="py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(order._id)}
+                      onChange={() => toggleSelect(order._id)}
+                      aria-label={`Select order ${order._id.slice(-8).toUpperCase()}`}
+                      className="h-4 w-4 rounded"
+                    />
+                  </td>
                   <td className="py-3 font-mono text-xs">
                     #{order._id.slice(-8).toUpperCase()}
                   </td>
@@ -796,7 +979,7 @@ export default function AdminOrdersPage() {
                     {order.items.length} item{order.items.length !== 1 ? "s" : ""}
                   </td>
                   <td className="py-3 font-semibold text-emerald-700">
-                    ₹{(order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) + (order.shipping || 0) - (order.discount || 0)).toLocaleString("en-IN")}
+                    ₹{calcOrderTotal(order).toLocaleString("en-IN")}
                   </td>
                   <td className="py-3">
                     <select
@@ -806,7 +989,7 @@ export default function AdminOrdersPage() {
                       className={`rounded-full border-0 px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer ${statusColor[order.paymentStatus] || "bg-muted text-foreground"
                         }`}
                     >
-                      {paymentStatusOptions.map((s) => (
+                      {nextPaymentStatuses(order.paymentStatus).map((s) => (
                         <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                       ))}
                     </select>
@@ -819,7 +1002,7 @@ export default function AdminOrdersPage() {
                       className={`rounded-full border-0 px-2.5 py-1.5 text-xs font-medium capitalize cursor-pointer ${statusColor[order.orderStatus] || "bg-muted text-foreground"
                         }`}
                     >
-                      {orderStatusOptions.map((s) => (
+                      {nextOrderStatuses(order.orderStatus).map((s) => (
                         <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                       ))}
                     </select>
@@ -852,7 +1035,17 @@ export default function AdminOrdersPage() {
             </tbody>
           </table>
         </div>
+        </div>
       )}
+
+      <Pagination
+        page={page}
+        pages={pages}
+        total={total}
+        limit={PAGE_SIZE}
+        onPageChange={setPage}
+        disabled={fetching}
+      />
     </div>
   );
 }

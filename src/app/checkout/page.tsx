@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag, CreditCard, MapPin, ArrowLeft, Minus, Plus, Trash2, Save } from "lucide-react";
+import { ShoppingBag, CreditCard, MapPin, ArrowLeft, Minus, Plus, Trash2, Save, Tag, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -101,9 +101,69 @@ export default function CheckoutPage() {
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
   const [shippingSettings, setShippingSettings] = useState(DEFAULT_SHIPPING);
 
+  // Coupon preview — the server re-validates and re-prices at create-order.
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+
   const subtotal = getSubtotal();
-  const shipping = computeShipping(subtotal, shippingSettings);
-  const total = subtotal + shipping;
+  const discount = coupon ? Math.min(coupon.discount, subtotal) : 0;
+  // Free-shipping threshold applies to what is actually paid for items (matches the server).
+  const shipping = computeShipping(subtotal - discount, shippingSettings);
+  const total = subtotal - discount + shipping;
+
+  const checkCoupon = useCallback(
+    async (code: string) => {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          items: items.map((i) => ({ _id: i._id, quantity: i.quantity })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Invalid coupon");
+      return data as { code: string; discount: number };
+    },
+    [items]
+  );
+
+  const applyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setApplyingCoupon(true);
+    setCouponError("");
+    try {
+      const result = await checkCoupon(couponInput.trim());
+      setCoupon({ code: result.code, discount: result.discount });
+      setCouponInput("");
+      toast.success(`Coupon ${result.code} applied`);
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : "Invalid coupon");
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
+
+  // The cart changed after a coupon was applied: re-check it so the discount is never stale.
+  useEffect(() => {
+    if (!coupon) return;
+    let cancelled = false;
+    checkCoupon(coupon.code)
+      .then((r) => {
+        if (!cancelled && r.discount !== coupon.discount) setCoupon({ code: r.code, discount: r.discount });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCoupon(null);
+        setCouponError(err instanceof Error ? err.message : "Coupon removed");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal]);
 
   // Fetch shipping settings from admin config
   useEffect(() => {
@@ -271,6 +331,7 @@ export default function CheckoutPage() {
           // Stored on the pending order so the Razorpay webhook can finalize it
           // even if this tab is closed right after payment.
           shippingAddress: address,
+          couponCode: coupon?.code,
         }),
       });
 
@@ -609,6 +670,56 @@ export default function CheckoutPage() {
 
               <Separator />
 
+              {/* Coupon */}
+              {coupon ? (
+                <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2 font-medium text-green-700">
+                    <Tag className="h-4 w-4" /> {coupon.code} applied
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoupon(null);
+                      setCouponError("");
+                    }}
+                    className="rounded p-1 text-green-700 hover:bg-green-100"
+                    aria-label="Remove coupon"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex gap-2">
+                    <Input
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value.toUpperCase());
+                        setCouponError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          applyCoupon();
+                        }
+                      }}
+                      placeholder="Coupon code"
+                      maxLength={30}
+                      aria-label="Coupon code"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={applyCoupon}
+                      disabled={applyingCoupon || !couponInput.trim()}
+                    >
+                      {applyingCoupon ? "..." : "Apply"}
+                    </Button>
+                  </div>
+                  {couponError && <p className="text-xs text-red-500">{couponError}</p>}
+                </div>
+              )}
+
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
@@ -622,6 +733,12 @@ export default function CheckoutPage() {
                       : `₹${shipping}`}
                   </span>
                 </div>
+                {discount > 0 && coupon && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Coupon ({coupon.code})</span>
+                    <span>-₹{discount.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
                 {shipping > 0 && shippingSettings.enableFreeShipping && (
                   <p className="text-xs text-wellness-600">
                     Free shipping on orders ₹{shippingSettings.freeShippingThreshold.toLocaleString("en-IN")}+

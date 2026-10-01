@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/admin/ConfirmProvider";
 import { useEffect, useState, useCallback } from "react";
 import {
   Megaphone,
@@ -65,6 +66,7 @@ const emptyBanner: {
 };
 
 export default function MarketingPage() {
+  const confirm = useConfirm();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -101,9 +103,8 @@ export default function MarketingPage() {
         : "/api/admin/banners";
       const method = editing ? "PUT" : "POST";
 
+      // Empty dates are sent as "" so editing a banner can clear them.
       const payload: any = { ...form };
-      if (!payload.startDate) delete payload.startDate;
-      if (!payload.endDate) delete payload.endDate;
 
       const res = await fetch(url, {
         method,
@@ -117,7 +118,8 @@ export default function MarketingPage() {
         setForm(emptyBanner);
         fetchBanners();
       } else {
-        alert("Failed to save banner");
+        const data = await res.json().catch(() => null);
+        alert(data?.error || "Failed to save banner");
       }
     } catch (err) {
       alert("Error saving banner");
@@ -126,7 +128,7 @@ export default function MarketingPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this banner?")) return;
+    if (!(await confirm("Delete this banner?"))) return;
     try {
       await fetch(`/api/admin/banners/${id}`, { method: "DELETE" });
       fetchBanners();

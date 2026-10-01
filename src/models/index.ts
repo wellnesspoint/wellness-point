@@ -6,3 +6,8 @@ export { default as Blog } from "./Blog";
 export { default as Testimonial } from "./Testimonial";
 export { default as NewsletterSubscriber } from "./NewsletterSubscriber";
 export { default as Review } from "./Review";
+export { default as AuditLog } from "./AuditLog";
+export { default as Coupon } from "./Coupon";
+export { default as StockMovement } from "./StockMovement";
+export { default as SiteSettings } from "./SiteSettings";
+export { default as NewsletterCampaign } from "./NewsletterCampaign";

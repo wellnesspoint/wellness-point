@@ -3,8 +3,10 @@ import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import Order from "@/models/Order";
-import Wishlist from "@/models/Wishlist";
-import Review from "@/models/Review";
+import { calcOrderTotal } from "@/lib/order-math";
+import { removeUsers } from "@/lib/user-deletion";
+import { logAudit } from "@/lib/audit";
+import { USER_PUBLIC_FIELDS } from "@/lib/user-fields";
 
 export async function GET(
   request: NextRequest,
@@ -18,18 +20,19 @@ export async function GET(
   await connectDB();
 
   try {
-    const user = await User.findById(id).select("-password").lean();
+    const user = await User.findById(id).select(USER_PUBLIC_FIELDS).lean();
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const orders = await Order.find({ user: id })
+    // Abandoned checkouts ("pending") aren't orders; keep them out of the history and counts.
+    const orders = await Order.find({ user: id, paymentStatus: { $ne: "pending" } })
       .sort({ createdAt: -1 })
       .lean();
 
     const totalSpent = orders
       .filter((o: any) => o.paymentStatus === "paid")
-      .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+      .reduce((sum: number, o: any) => sum + calcOrderTotal(o) - (o.refundedAmount || 0), 0);
 
     return NextResponse.json({
       user: { ...user, orderCount: orders.length, totalSpent },
@@ -89,11 +92,20 @@ export async function PUT(
       id,
       { $set: updateFields },
       { new: true }
-    ).select("-password");
+    ).select(USER_PUBLIC_FIELDS);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+
+    await logAudit(session, {
+      action: updateFields.role !== undefined ? "user.role" : "user.access",
+      entity: "user",
+      entityId: id,
+      summary: `${user.email}: ${Object.entries(updateFields)
+        .map(([k, v]) => `${k} → ${v}`)
+        .join(", ")}`,
+    });
 
     return NextResponse.json({ user });
   } catch (error) {
@@ -125,15 +137,21 @@ export async function DELETE(
       );
     }
 
-    // Cascade delete all user-related data
-    await Promise.all([
-      Wishlist.deleteMany({ user: id }),
-      Review.deleteMany({ user: id }),
-    ]);
+    const { anonymized } = await removeUsers([id]);
 
-    await User.findByIdAndDelete(id);
+    await logAudit(session, {
+      action: "user.delete",
+      entity: "user",
+      entityId: id,
+      summary: `${anonymized.length ? "Anonymised" : "Deleted"} customer ${user.email}`,
+    });
 
-    return NextResponse.json({ message: "User deleted" });
+    return NextResponse.json({
+      message: anonymized.length
+        ? "User has past orders, so the account was anonymised instead of deleted"
+        : "User deleted",
+      anonymized: anonymized.length > 0,
+    });
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
   }

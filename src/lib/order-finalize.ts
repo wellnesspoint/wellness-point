@@ -2,6 +2,7 @@ import razorpay from "@/lib/razorpay";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import { sendOrderConfirmation } from "@/lib/email";
+import { checkLowStock, logStockMovements } from "@/lib/stock";
 
 export type FinalizeResult =
   | { status: "paid" }
@@ -145,6 +146,16 @@ export async function finalizeOrder(input: FinalizeInput): Promise<FinalizeResul
     order.finalizingAt = undefined;
     await order.save();
 
+    // Stock history + low-stock alert (both best-effort, never fail a paid order).
+    await logStockMovements(
+      decremented.map((d) => ({
+        product: d.product,
+        delta: -d.quantity,
+        reason: "order" as const,
+        order: order._id,
+      }))
+    );
+
     // MUST be awaited — serverless functions are frozen after the response.
     try {
       await sendOrderConfirmation({
@@ -161,12 +172,15 @@ export async function finalizeOrder(input: FinalizeInput): Promise<FinalizeResul
         total: order.total,
         shippingAddress: address,
         discount: order.discount,
+        couponCode: order.couponCode,
         createdAt: order.createdAt,
       });
     } catch (emailErr) {
       console.error("Order confirmation email failed:", emailErr);
       // best-effort — never fail a paid order over email
     }
+
+    await checkLowStock();
 
     return { status: "paid" };
   } catch (err) {

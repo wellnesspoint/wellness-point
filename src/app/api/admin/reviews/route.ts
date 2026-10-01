@@ -13,6 +13,7 @@ export async function GET() {
     const reviews = await Review.find()
       .populate("product", "name slug images")
       .sort({ createdAt: -1 })
+      .limit(1000)
       .lean();
 
     return NextResponse.json({ reviews });

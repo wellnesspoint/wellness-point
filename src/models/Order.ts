@@ -31,6 +31,22 @@ export interface IOrder extends Document {
   razorpayPaymentId?: string;
   razorpaySignature?: string;
   stockRestored?: boolean;
+  couponCode?: string;
+  tracking?: { courier?: string; trackingNumber?: string; trackingUrl?: string };
+  statusHistory?: {
+    field: "orderStatus" | "paymentStatus";
+    from?: string;
+    to: string;
+    by?: string;
+    at: Date;
+  }[];
+  /** When an abandoned-checkout reminder email was sent. */
+  reminderSentAt?: Date;
+  /** Admin-only notes thread (the legacy `notes` string is kept for system messages). */
+  internalNotes?: { text: string; by?: string; at: Date }[];
+  /** Partial refunds issued through Razorpay (a full refund sets paymentStatus "refunded"). */
+  refunds?: { amount: number; razorpayRefundId?: string; reason?: string; by?: string; at: Date }[];
+  refundedAmount?: number;
   finalizing?: boolean;
   finalizingAt?: Date;
   notes?: string;
@@ -85,6 +101,43 @@ const orderSchema = new Schema<IOrder>(
     // Set once stock has been returned to inventory for a cancelled/refunded order,
     // so admin re-saves (or repeated status transitions) never double-restore it.
     stockRestored: { type: Boolean, default: false },
+    couponCode: { type: String, uppercase: true, trim: true },
+    tracking: {
+      courier: { type: String, trim: true, maxlength: 80 },
+      trackingNumber: { type: String, trim: true, maxlength: 80 },
+      trackingUrl: { type: String, trim: true, maxlength: 500 },
+    },
+    // Append-only trail of admin status changes (who/when).
+    statusHistory: [
+      {
+        _id: false,
+        field: { type: String, enum: ["orderStatus", "paymentStatus"], required: true },
+        from: { type: String },
+        to: { type: String, required: true },
+        by: { type: String },
+        at: { type: Date, default: Date.now },
+      },
+    ],
+    reminderSentAt: { type: Date },
+    internalNotes: [
+      {
+        _id: false,
+        text: { type: String, required: true, maxlength: 1000 },
+        by: { type: String },
+        at: { type: Date, default: Date.now },
+      },
+    ],
+    refunds: [
+      {
+        _id: false,
+        amount: { type: Number, required: true, min: 0 },
+        razorpayRefundId: { type: String },
+        reason: { type: String, maxlength: 200 },
+        by: { type: String },
+        at: { type: Date, default: Date.now },
+      },
+    ],
+    refundedAmount: { type: Number, default: 0, min: 0 },
     // Short-lived claim taken while a payment is being finalized, so verify and
     // the webhook can never both process the same order.
     finalizing: { type: Boolean, default: false },
@@ -97,6 +150,7 @@ const orderSchema = new Schema<IOrder>(
 );
 
 orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ couponCode: 1, paymentStatus: 1 }, { sparse: true });
 // Abandoned checkouts (a "pending" order is created before payment) are
 // purged after 7 days instead of accumulating forever. Paid/failed/refunded
 // orders are never touched (partial filter).

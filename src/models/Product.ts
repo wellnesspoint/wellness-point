@@ -12,6 +12,11 @@ export interface IProduct extends Document {
   benefits: string[];
   usage: string;
   stock: number;
+  /** alert (dashboard + email) when stock falls to this level or below */
+  lowStockThreshold?: number;
+  lowStockAlertedAt?: Date;
+  /** soft delete: archived products are hidden everywhere but keep their reviews */
+  archivedAt?: Date;
   sku?: string;
   weight?: number;
   gst?: number;
@@ -39,6 +44,9 @@ const productSchema = new Schema<IProduct>(
     benefits: [{ type: String }],
     usage: { type: String },
     stock: { type: Number, required: true, default: 0, min: 0 },
+    lowStockThreshold: { type: Number, min: 0, default: 10 },
+    lowStockAlertedAt: { type: Date },
+    archivedAt: { type: Date },
     sku: { type: String, trim: true },
     weight: { type: Number, min: 0 },
     gst: { type: Number, min: 0, max: 100, default: 18 },

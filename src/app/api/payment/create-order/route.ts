@@ -3,12 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import razorpay from "@/lib/razorpay";
 import connectDB from "@/lib/db";
-import Product from "@/models/Product";
 import Order from "@/models/Order";
 import ShippingSettings from "@/models/ShippingSettings";
 import { rateLimit } from "@/lib/rate-limit";
 import { computeShipping } from "@/lib/shipping";
 import { validateShippingAddress } from "@/lib/utils";
+import { priceCart } from "@/lib/cart-pricing";
+import { validateCoupon } from "@/lib/coupons";
 
 /**
  * POST /api/payment/create-order
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { items, shippingAddress } = await req.json();
+    const { items, shippingAddress, couponCode } = await req.json();
 
     // Validate the address now (not only at verify time) so it is stored on the
     // pending order — that lets the Razorpay webhook finalize the order even if
@@ -56,79 +57,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validatedAddress.error }, { status: 400 });
     }
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "Cart items are required" },
-        { status: 400 }
-      );
+    // Real prices/stock from the database; the client never controls an amount.
+    const priced = await priceCart(items);
+    if (!priced.ok) {
+      return NextResponse.json({ error: priced.error }, { status: 400 });
     }
+    const validatedItems = priced.items;
+    const subtotal = priced.subtotal;
 
-    // Merge duplicate product ids (a direct API call could send the same
-    // product twice — the cart UI itself always merges these already).
-    const qtyByProduct = new Map<string, number>();
-    for (const item of items) {
-      const id = String(item._id);
-      const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
-      qtyByProduct.set(id, (qtyByProduct.get(id) || 0) + qty);
-    }
-    const productIds = Array.from(qtyByProduct.keys());
-
-    // Look up all products from DB to get real prices and stock
-    const products = await Product.find({
-      _id: { $in: productIds },
-      isActive: true,
-    }).lean();
-
-    if (products.length !== productIds.length) {
-      return NextResponse.json(
-        { error: "Some products are no longer available" },
-        { status: 400 }
-      );
-    }
-
-    // Build a map for easy lookup
-    const productMap = new Map(
-      products.map((p: any) => [p._id.toString(), p])
-    );
-
-    // Validate stock and calculate server-side totals
-    const validatedItems = [];
-    let subtotal = 0;
-
-    for (const id of productIds) {
-      const product = productMap.get(id);
-      if (!product) {
-        return NextResponse.json(
-          { error: `Product not found: ${id}` },
-          { status: 400 }
-        );
+    // Optional coupon — re-validated here, so the client can't invent a discount.
+    let discount = 0;
+    let appliedCode: string | undefined;
+    if (couponCode) {
+      const check = await validateCoupon(couponCode, subtotal, userId);
+      if (!check.ok) {
+        return NextResponse.json({ error: check.error }, { status: 400 });
       }
-
-      const requestedQty = qtyByProduct.get(id)!;
-
-      if (product.stock < requestedQty) {
-        return NextResponse.json(
-          {
-            error: `Insufficient stock for "${product.name}". Available: ${product.stock}`,
-          },
-          { status: 400 }
-        );
-      }
-
-      // A discount only applies when it is a real, lower, non-zero price.
-      const unitPrice =
-        product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price
-          ? product.discountPrice
-          : product.price;
-      subtotal += unitPrice * requestedQty;
-
-      validatedItems.push({
-        product: product._id.toString(),
-        name: product.name,
-        image: product.images?.[0] || "",
-        price: unitPrice,
-        quantity: requestedQty,
-      });
+      discount = check.discount;
+      appliedCode = check.coupon.code;
     }
 
     // Shipping — admin settings, with one shared fallback (see lib/shipping.ts)
@@ -138,8 +84,9 @@ export async function POST(req: NextRequest) {
     } catch {
       // fall through to defaults
     }
-    const shipping = computeShipping(subtotal, shippingConfig as any);
-    const total = Math.round((subtotal + shipping) * 100) / 100;
+    // Free-shipping threshold applies to what the customer actually pays for items.
+    const shipping = computeShipping(subtotal - discount, shippingConfig as any);
+    const total = Math.round((subtotal - discount + shipping) * 100) / 100;
 
     if (total < 1) {
       return NextResponse.json({ error: "Invalid order total" }, { status: 400 });
@@ -167,7 +114,8 @@ export async function POST(req: NextRequest) {
       shippingAddress: validatedAddress.address,
       subtotal,
       shipping,
-      discount: 0,
+      discount,
+      couponCode: appliedCode,
       total,
       paymentStatus: "pending",
       orderStatus: "processing",
@@ -184,6 +132,8 @@ export async function POST(req: NextRequest) {
         items: validatedItems,
         subtotal,
         shipping,
+        discount,
+        couponCode: appliedCode,
         total,
       },
     });

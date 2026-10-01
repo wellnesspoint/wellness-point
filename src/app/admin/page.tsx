@@ -16,6 +16,8 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
+import TrendChart from "@/components/admin/TrendChart";
+import { ArrowDownRight, ArrowUpRight, Truck, RotateCcw, MessageCircle, Star as StarIcon } from "lucide-react";
 
 interface Stats {
   totalRevenue: number;
@@ -51,16 +53,88 @@ const defaultStats: Stats = {
   subscribers: 0,
 };
 
+interface Trend {
+  dailyRevenue: { date: string; revenue: number; orders: number }[];
+  comparison: { currentRevenue: number; previousRevenue: number; currentOrders: number; previousOrders: number };
+}
+
+interface ActionBrief {
+  _id: string;
+  name: string;
+  total: number;
+  createdAt: string;
+}
+
+interface ActionItems {
+  unshipped: { count: number; orders: ActionBrief[] };
+  failedRefunds: { count: number; orders: ActionBrief[] };
+  newContacts: number;
+  pendingReviews: number;
+}
+
+const PERIODS = [
+  { value: "7", label: "7 days" },
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+];
+
+const pctChange = (current: number, previous: number) =>
+  previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
+
+const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+function Delta({ current, previous }: { current: number; previous: number }) {
+  const change = pctChange(current, previous);
+  const up = change >= 0;
+  const Icon = up ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${up ? "text-green-600" : "text-red-600"}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {Math.abs(change).toFixed(0)}%
+      <span className="font-normal text-muted-foreground"> vs previous</span>
+    </span>
+  );
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats>(defaultStats);
   const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState("30");
+  const [trend, setTrend] = useState<Trend | null>(null);
+  const [trendLoading, setTrendLoading] = useState(true);
+  const [actions, setActions] = useState<ActionItems | null>(null);
+
+  // Needs-attention items (also drives the sidebar badges)
+  useEffect(() => {
+    fetch("/api/admin/summary")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setActions(d.actions))
+      .catch(() => {});
+  }, []);
+
+  // Sales trend for the selected period, compared with the period before it
+  useEffect(() => {
+    let cancelled = false;
+    setTrendLoading(true);
+    fetch(`/api/admin/reports?period=${days}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.dailyRevenue) setTrend(d);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setTrendLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [days]);
 
   useEffect(() => {
     async function load() {
       try {
         const res = await fetch("/api/admin/stats");
         const data = await res.json();
-        if (data) setStats(data);
+        // An error response ({ error }) lacks the stats shape and would crash the cards.
+        if (res.ok && typeof data.totalRevenue === "number") setStats(data);
       } catch {
         //
       } finally {
@@ -183,6 +257,128 @@ export default function AdminDashboard() {
           </Link>
         ))}
       </div>
+
+      {/* Action needed */}
+      {actions &&
+        (actions.unshipped.count > 0 ||
+          actions.failedRefunds.count > 0 ||
+          actions.newContacts > 0 ||
+          actions.pendingReviews > 0) && (
+          <Card className="border-0 border-l-4 border-l-amber-400 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Action needed
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {actions.failedRefunds.count > 0 && (
+                <Link
+                  href="/admin/orders"
+                  className="flex items-start gap-3 rounded-lg bg-red-50 p-3 hover:bg-red-100"
+                >
+                  <RotateCcw className="mt-0.5 h-4 w-4 text-red-600" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-red-700">
+                      {actions.failedRefunds.count} automatic refund{actions.failedRefunds.count === 1 ? "" : "s"} failed
+                    </p>
+                    <p className="text-xs text-red-600/80">
+                      Customers were charged — open the order and set Payment → Refunded to retry.
+                    </p>
+                  </div>
+                </Link>
+              )}
+              {actions.unshipped.count > 0 && (
+                <Link
+                  href="/admin/orders"
+                  className="flex items-start gap-3 rounded-lg bg-amber-50 p-3 hover:bg-amber-100"
+                >
+                  <Truck className="mt-0.5 h-4 w-4 text-amber-600" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-amber-700">
+                      {actions.unshipped.count} order{actions.unshipped.count === 1 ? "" : "s"} unshipped for over 48 hours
+                    </p>
+                    <p className="text-xs text-amber-700/80">
+                      Oldest: {actions.unshipped.orders[0]?.name} ·{" "}
+                      {new Date(actions.unshipped.orders[0]?.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    </p>
+                  </div>
+                </Link>
+              )}
+              {actions.newContacts > 0 && (
+                <Link
+                  href="/admin/contacts"
+                  className="flex items-start gap-3 rounded-lg bg-blue-50 p-3 hover:bg-blue-100"
+                >
+                  <MessageCircle className="mt-0.5 h-4 w-4 text-blue-600" />
+                  <p className="text-sm font-semibold text-blue-700">
+                    {actions.newContacts} unanswered contact message{actions.newContacts === 1 ? "" : "s"}
+                  </p>
+                </Link>
+              )}
+              {actions.pendingReviews > 0 && (
+                <Link
+                  href="/admin/reviews"
+                  className="flex items-start gap-3 rounded-lg bg-purple-50 p-3 hover:bg-purple-100"
+                >
+                  <StarIcon className="mt-0.5 h-4 w-4 text-purple-600" />
+                  <p className="text-sm font-semibold text-purple-700">
+                    {actions.pendingReviews} review{actions.pendingReviews === 1 ? "" : "s"} waiting for approval
+                  </p>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+      {/* Sales trend */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="flex flex-col gap-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base font-semibold">Sales trend</CardTitle>
+          <div className="flex gap-1 rounded-lg bg-muted p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setDays(p.value)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  days === p.value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {trendLoading || !trend ? (
+            <Skeleton className="h-44 w-full rounded-lg" />
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Revenue (last {days} days)</p>
+                  <p className="text-2xl font-bold text-foreground">{rupees(trend.comparison.currentRevenue)}</p>
+                  <Delta current={trend.comparison.currentRevenue} previous={trend.comparison.previousRevenue} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Orders</p>
+                  <p className="text-2xl font-bold text-foreground">{trend.comparison.currentOrders}</p>
+                  <Delta current={trend.comparison.currentOrders} previous={trend.comparison.previousOrders} />
+                </div>
+              </div>
+              <div className="lg:col-span-2">
+                <TrendChart
+                  data={trend.dailyRevenue.map((d) => ({
+                    label: new Date(d.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+                    value: d.revenue,
+                  }))}
+                  format={rupees}
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Orders */}
@@ -366,13 +562,13 @@ export default function AdminDashboard() {
                 <span className="text-sm font-semibold">{loading ? "—" : stats.refundedOrders}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Conversion Rate</span>
+                <span className="text-xs text-muted-foreground">Payment Success Rate</span>
                 <span className="text-sm font-semibold">
                   {loading
                     ? "—"
-                    : stats.totalOrders > 0 && stats.totalCustomers > 0
-                    ? `${((stats.paidOrders / stats.totalOrders) * 100).toFixed(1)}%`
-                    : "0%"}
+                    : stats.paidOrders + stats.failedOrders > 0
+                    ? `${((stats.paidOrders / (stats.paidOrders + stats.failedOrders)) * 100).toFixed(1)}%`
+                    : "—"}
                 </span>
               </div>
             </CardContent>

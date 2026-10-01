@@ -1,5 +1,6 @@
 "use client";
 
+import toast from "react-hot-toast";
 import { useEffect, useState, useCallback } from "react";
 import {
   Truck,
@@ -82,10 +83,13 @@ export default function ShippingSettingsPage() {
       if (res.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || "Failed to save settings");
       }
     } catch (err) {
       console.error("Failed to save settings:", err);
-      alert("Failed to save settings");
+      toast.error("Failed to save settings");
     }
     setSaving(false);
   };

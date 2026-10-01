@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import connectDB from "@/lib/db";
 import Review from "@/models/Review";
 import Product from "@/models/Product";
@@ -74,16 +75,12 @@ export async function DELETE(req: NextRequest, { params }: Props) {
 }
 
 async function recalculateProductRating(productId: string) {
-  const approvedReviews = await Review.find({
-    product: productId,
-    isApproved: true,
-  });
-
-  const count = approvedReviews.length;
-  const avg =
-    count > 0
-      ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) / count
-      : 0;
+  const [stats] = await Review.aggregate([
+    { $match: { product: new mongoose.Types.ObjectId(productId), isApproved: true } },
+    { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: "$rating" } } },
+  ]);
+  const count: number = stats?.count ?? 0;
+  const avg: number = stats?.avg ?? 0;
 
   await Product.findByIdAndUpdate(productId, {
     rating: Math.round(avg * 10) / 10,

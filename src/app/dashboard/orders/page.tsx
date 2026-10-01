@@ -24,6 +24,7 @@ interface Order {
   discount: number;
   paymentStatus: string;
   orderStatus: string;
+  tracking?: { courier?: string; trackingNumber?: string; trackingUrl?: string };
   createdAt: string;
   shippingAddress: {
     fullName: string;
@@ -207,6 +208,29 @@ export default function OrdersPage() {
                       <span>₹{(order.items.reduce((s, item) => s + item.price * item.quantity, 0) + (order.shipping || 0) - (order.discount || 0)).toLocaleString("en-IN")}</span>
                     </div>
                   </div>
+
+                  {/* Tracking */}
+                  {(order.tracking?.courier || order.tracking?.trackingNumber || order.tracking?.trackingUrl) && (
+                    <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                      <p className="mb-1 font-medium text-emerald-800">Tracking</p>
+                      {order.tracking.courier && (
+                        <p className="text-emerald-900">Courier: {order.tracking.courier}</p>
+                      )}
+                      {order.tracking.trackingNumber && (
+                        <p className="text-emerald-900">Tracking no: <span className="font-mono">{order.tracking.trackingNumber}</span></p>
+                      )}
+                      {order.tracking.trackingUrl && /^https:\/\//i.test(order.tracking.trackingUrl) && (
+                        <a
+                          href={order.tracking.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block font-medium text-emerald-700 underline"
+                        >
+                          Track your package
+                        </a>
+                      )}
+                    </div>
+                  )}
 
                   {/* Shipping Address */}
                   {order.shippingAddress && (
