@@ -46,6 +46,8 @@ export default function AdminCustomersPage() {
   const [loadingOrders, setLoadingOrders] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const fetchUsers = (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -142,12 +144,71 @@ export default function AdminCustomersPage() {
     toast.success("CSV downloaded");
   };
 
+  const bulkDelete = async () => {
+    const ids = selectableFilteredIds.filter((id) => selectedIds.has(id));
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Permanently delete ${ids.length} customer${ids.length > 1 ? "s" : ""}? Their wishlists and reviews will be removed too. This cannot be undone.`
+      )
+    )
+      return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete customers");
+        return;
+      }
+      const deleted = new Set<string>(data.deleted || []);
+      setUsers((prev) => prev.filter((u) => !deleted.has(u._id)));
+      setSelectedIds(new Set());
+      if (data.skipped?.length) {
+        toast.success(`${deleted.size} deleted, ${data.skipped.length} skipped (admin or not found)`);
+      } else {
+        toast.success(`${deleted.size} customer${deleted.size !== 1 ? "s" : ""} deleted`);
+      }
+    } catch {
+      toast.error("Failed to delete customers");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const filtered = users.filter(
     (u) =>
       u.name?.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       u.phone?.includes(search)
   );
+
+  // Admins can never be bulk-deleted, so they get no checkbox.
+  const selectableFilteredIds = filtered.filter((u) => u.role !== "admin").map((u) => u._id);
+  const selectedVisibleCount = selectableFilteredIds.filter((id) => selectedIds.has(id)).length;
+  const allSelected =
+    selectableFilteredIds.length > 0 && selectedVisibleCount === selectableFilteredIds.length;
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleSelectAll = () =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) selectableFilteredIds.forEach((id) => next.delete(id));
+      else selectableFilteredIds.forEach((id) => next.add(id));
+      return next;
+    });
 
   if (loading) {
     return (
@@ -379,6 +440,28 @@ export default function AdminCustomersPage() {
         </div>
       </div>
 
+      {selectedVisibleCount > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium text-red-700">
+            {selectedVisibleCount} customer{selectedVisibleCount > 1 ? "s" : ""} selected
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedIds(new Set())}
+              disabled={bulkDeleting}
+            >
+              Clear
+            </Button>
+            <Button variant="destructive" size="sm" onClick={bulkDelete} disabled={bulkDeleting}>
+              <Trash2 className="mr-1 h-4 w-4" />
+              {bulkDeleting ? "Deleting..." : `Delete selected (${selectedVisibleCount})`}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="py-12 text-center">
@@ -391,6 +474,16 @@ export default function AdminCustomersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
+                <th className="w-10 pb-3">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all customers"
+                    className="h-4 w-4 cursor-pointer accent-emerald-600"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    disabled={selectableFilteredIds.length === 0}
+                  />
+                </th>
                 <th className="pb-3 font-medium">Customer</th>
                 <th className="pb-3 font-medium">Provider</th>
                 <th className="pb-3 font-medium">Role</th>
@@ -401,7 +494,21 @@ export default function AdminCustomersPage() {
             </thead>
             <tbody className="divide-y">
               {filtered.map((user) => (
-                <tr key={user._id} className="hover:bg-accent">
+                <tr
+                  key={user._id}
+                  className={`hover:bg-accent ${selectedIds.has(user._id) ? "bg-red-50/60" : ""}`}
+                >
+                  <td className="w-10 py-3">
+                    {user.role !== "admin" && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${user.name || user.email}`}
+                        className="h-4 w-4 cursor-pointer accent-emerald-600"
+                        checked={selectedIds.has(user._id)}
+                        onChange={() => toggleSelect(user._id)}
+                      />
+                    )}
+                  </td>
                   <td className="py-3">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
