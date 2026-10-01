@@ -44,6 +44,9 @@ function LoginForm() {
     if (err === "invalid-verification") {
       toast.error("Invalid verification link.");
     }
+    if (err === "oauth-no-email") {
+      toast.error("We couldn't get an email address from that account. Please sign up with your email instead.");
+    }
     if (err === "oauth-email-exists") {
       toast.error("An account with this email already exists. Please sign in with your email and password instead.");
     }

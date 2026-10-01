@@ -9,7 +9,7 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
-    const { success } = rateLimit(`resend-verify:${ip}`, {
+    const { success } = await rateLimit(`resend-verify:${ip}`, {
       limit: 3,
       windowMs: 15 * 60 * 1000,
     });

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     // no limiter at all, making it usable for verification-email spam
     // against arbitrary addresses and for account-enumeration at scale.
     const ip = getClientIp(req);
-    const { success: withinLimit } = rateLimit(`register:${ip}`, {
+    const { success: withinLimit } = await rateLimit(`register:${ip}`, {
       limit: 5,
       windowMs: 15 * 60 * 1000,
     });

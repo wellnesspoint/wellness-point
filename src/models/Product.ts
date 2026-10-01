@@ -57,7 +57,6 @@ const productSchema = new Schema<IProduct>(
 
 productSchema.index({ isFeatured: 1, isActive: 1 });
 productSchema.index({ isActive: 1, createdAt: -1 });
-productSchema.index({ slug: 1 });
 
 const Product: Model<IProduct> =
   mongoose.models.Product ||

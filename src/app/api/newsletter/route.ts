@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     // Rate limit: 3 subscription attempts per 15 minutes per IP
     const ip = getClientIp(req);
-    const { success: withinLimit } = rateLimit(`newsletter:${ip}`, {
+    const { success: withinLimit } = await rateLimit(`newsletter:${ip}`, {
       limit: 3,
       windowMs: 15 * 60 * 1000,
     });
@@ -37,10 +37,9 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       if (existing.isActive) {
-        return NextResponse.json(
-          { error: "You're already subscribed!" },
-          { status: 409 }
-        );
+        // Same response as a fresh signup — a distinct 409 would let anyone
+        // probe which addresses are on the list.
+        return NextResponse.json({ message: "Successfully subscribed!" });
       }
       existing.isActive = true;
       await existing.save();

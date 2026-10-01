@@ -3,9 +3,21 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    const { success: withinLimit } = await rateLimit(`reset-password:${getClientIp(req)}`, {
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    });
+    if (!withinLimit) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const { token, email, password } = await req.json();
 
     if (!token || !email || !password) {
@@ -46,6 +58,9 @@ export async function POST(req: NextRequest) {
     // Hash new password and save
     // Also mark email as verified — clicking a reset link proves email ownership
     user.password = await bcrypt.hash(password, 12);
+    // Invalidate every session issued before now (see the jwt callback in
+    // lib/auth.ts) — otherwise a hijacked session survives the reset.
+    user.passwordChangedAt = new Date();
     user.emailVerified = true;
     user.emailVerifyToken = undefined;
     user.emailVerifyExpires = undefined;

@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     // Rate limit: 20 uploads per 15 minutes
     const ip = getClientIp(req);
-    const { success: withinLimit } = rateLimit(`upload:${ip}`, {
+    const { success: withinLimit } = await rateLimit(`upload:${ip}`, {
       limit: 20,
       windowMs: 15 * 60 * 1000,
     });

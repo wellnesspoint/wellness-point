@@ -76,7 +76,7 @@ async function seed() {
           price: 2499,
           discountPrice: 1999,
           images: [
-            "https://images.unsplash.com/photo-1593095948071-474c5cc2c4d8?w=600",
+            "https://images.unsplash.com/photo-1693996045300-521e9d08cabc?w=600",
           ],
           ingredients: ["Whey Protein Isolate", "Cocoa Powder", "Natural Flavors", "Stevia"],
           benefits: [

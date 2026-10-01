@@ -3,6 +3,14 @@ import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import connectDB from "@/lib/db";
 import NewsletterSubscriber from "@/models/NewsletterSubscriber";
 import nodemailer from "nodemailer";
+import { escapeHtml } from "@/lib/utils";
+import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
+
+// Large lists take a while to send — allow the function to run long enough.
+export const maxDuration = 300;
+
+const BATCH_SIZE = 5;
+const BATCH_DELAY_MS = 1000;
 
 function getTransporter() {
   const host = process.env.SMTP_HOST;
@@ -64,12 +72,15 @@ export async function POST(req: NextRequest) {
       process.env.SMTP_FROM_SUPPORT || "Wellness Point <support@wellness-point.in>";
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wellness-point.in";
 
+    // Escape admin-entered text before it goes into the HTML template.
+    const safeSubject = escapeHtml(subject.trim());
+    const safeBody = escapeHtml(body).replace(/\r?\n/g, "<br />");
+
     let sent = 0;
     let failed = 0;
 
-    // Send emails in batches to avoid SMTP limits
-    for (const sub of subscribers) {
-      const unsubscribeUrl = `${baseUrl}/api/newsletter/unsubscribe?email=${encodeURIComponent(sub.email)}`;
+    const sendTo = async (email: string) => {
+      const unsubscribeUrl = buildUnsubscribeUrl(baseUrl, email);
 
       const html = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px">
@@ -77,8 +88,8 @@ export async function POST(req: NextRequest) {
             <h1 style="color:#fff;margin:0">Wellness Point</h1>
           </div>
           <div style="padding:24px;background:#f9fafb;border:1px solid #e5e7eb">
-            <h2 style="color:#065f46;margin-top:0">${subject}</h2>
-            <div style="color:#374151;line-height:1.6">${body.replace(/\n/g, "<br />")}</div>
+            <h2 style="color:#065f46;margin-top:0">${safeSubject}</h2>
+            <div style="color:#374151;line-height:1.6">${safeBody}</div>
           </div>
           <div style="text-align:center;padding:16px;color:#9ca3af;font-size:12px">
             &copy; ${new Date().getFullYear()} Wellness Point. All rights reserved.<br />
@@ -86,24 +97,30 @@ export async function POST(req: NextRequest) {
             <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline">Unsubscribe from newsletter</a>
           </div>
         </div>
-      `;   
+      `;
 
       try {
         await transporter.sendMail({
           from: fromAddress,
-          to: sub.email,
-          subject: `${subject} | Wellness Point`,
+          to: email,
+          subject: `${subject.trim()} | Wellness Point`,
           html,
+          headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` },
         });
         sent++;
       } catch (err) {
-        console.error(`Failed to send to ${sub.email}:`, err);
+        console.error(`Failed to send to ${email}:`, err);
         failed++;
       }
+    };
 
-      // Small delay between emails to avoid rate limits
-      if (sent % 10 === 0) {
-        await new Promise((r) => setTimeout(r, 1000));
+    // Small concurrent batches with a pause between them, to stay under SMTP
+    // rate limits without sending one-by-one (which times out on big lists).
+    for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
+      const batch = subscribers.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map((sub) => sendTo(sub.email)));
+      if (i + BATCH_SIZE < subscribers.length) {
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
       }
     }
 

@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import connectDB from "@/lib/db";
 import Wishlist from "@/models/Wishlist";
+import Product from "@/models/Product";
+import mongoose from "mongoose";
 
 export async function GET() {
   try {
@@ -43,14 +45,18 @@ export async function POST(req: NextRequest) {
     }
 
     const { productId } = await req.json();
-    if (!productId) {
+    if (!productId || !mongoose.isValidObjectId(productId)) {
       return NextResponse.json(
-        { error: "Product ID is required" },
+        { error: "A valid product ID is required" },
         { status: 400 }
       );
     }
 
     await connectDB();
+
+    if (!(await Product.exists({ _id: productId }))) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
 
     let wishlist = await Wishlist.findOne({
       user: (session.user as any).id,

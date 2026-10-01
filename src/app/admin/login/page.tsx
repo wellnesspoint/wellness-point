@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, KeyRound, ArrowLeft } from "lucide-react";
@@ -324,12 +325,12 @@ export default function AdminLoginPage() {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-            <a
+            <Link
               href="/"
               className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
             >
               ← Back to Store
-            </a>
+            </Link>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cart";
@@ -14,6 +14,7 @@ import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { FALLBACK_IMAGE } from "@/lib/constants";
+import { DEFAULT_SHIPPING, computeShipping } from "@/lib/shipping";
 
 declare global {
   interface Window {
@@ -77,7 +78,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState<Address>(getInitialAddress);
 
   // The address fetched from the user's profile (null = no saved address)
-  const profileAddressRef = useRef<Address | null>(null);
+  const [profileAddress, setProfileAddress] = useState<Address | null>(null);
   const [hasSavedAddress, setHasSavedAddress] = useState(false);
 
   // Whether user wants to save their (new/edited) address to profile
@@ -98,17 +99,10 @@ export default function CheckoutPage() {
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
-  const [shippingSettings, setShippingSettings] = useState({
-    flatRate: 99,
-    freeShippingThreshold: 999,
-    enableFreeShipping: true,
-  });
+  const [shippingSettings, setShippingSettings] = useState(DEFAULT_SHIPPING);
 
   const subtotal = getSubtotal();
-  const shipping =
-    shippingSettings.enableFreeShipping && subtotal >= shippingSettings.freeShippingThreshold
-      ? 0
-      : shippingSettings.flatRate;
+  const shipping = computeShipping(subtotal, shippingSettings);
   const total = subtotal + shipping;
 
   // Fetch shipping settings from admin config
@@ -170,7 +164,7 @@ export default function CheckoutPage() {
               state: savedAddr.state || "",
               pincode: savedAddr.pincode || "",
             };
-            profileAddressRef.current = mapped;
+            setProfileAddress(mapped);
 
             // Only prefill from saved address if user hasn't already typed something
             const hasCachedData = sessionStorage.getItem(STORAGE_KEY);
@@ -179,7 +173,7 @@ export default function CheckoutPage() {
             }
           } else {
             setHasSavedAddress(false);
-            profileAddressRef.current = null;
+            setProfileAddress(null);
 
             // No saved address — prefill name/email/phone from profile
             const hasCachedData = sessionStorage.getItem(STORAGE_KEY);
@@ -274,6 +268,9 @@ export default function CheckoutPage() {
             _id: item._id,
             quantity: item.quantity,
           })),
+          // Stored on the pending order so the Razorpay webhook can finalize it
+          // even if this tab is closed right after payment.
+          shippingAddress: address,
         }),
       });
 
@@ -312,7 +309,7 @@ export default function CheckoutPage() {
               // Save address to profile:
               // - First-time order (no saved address) → always save
               // - Returning order with edited address → save only if user opted in
-              const addressChanged = isAddressModified(address, profileAddressRef.current);
+              const addressChanged = isAddressModified(address, profileAddress);
               if (!hasSavedAddress || (addressChanged && saveToProfile)) {
                 await saveAddressToProfile();
               }
@@ -396,11 +393,11 @@ export default function CheckoutPage() {
         {/* Left – Address */}
         <div className="lg:col-span-2 space-y-6">
           {/* Saved address indicator */}
-          {hasSavedAddress && profileAddressRef.current && (
+          {hasSavedAddress && profileAddress && (
             <div className="flex items-center gap-2 rounded-lg border border-wellness-200 bg-wellness-50/50 px-4 py-2.5 text-sm">
               <MapPin className="h-4 w-4 text-wellness-600 shrink-0" />
               <span className="text-muted-foreground">
-                Shipping to <span className="font-medium text-foreground">{profileAddressRef.current.fullName}</span> — {profileAddressRef.current.city}, {profileAddressRef.current.state}
+                Shipping to <span className="font-medium text-foreground">{profileAddress.fullName}</span> — {profileAddress.city}, {profileAddress.state}
               </span>
             </div>
           )}
@@ -528,7 +525,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Save address checkbox — shown when user edits an existing saved address */}
-                {hasSavedAddress && isAddressModified(address, profileAddressRef.current) && (
+                {hasSavedAddress && isAddressModified(address, profileAddress) && (
                   <div className="sm:col-span-2 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2.5">
                     <input
                       type="checkbox"

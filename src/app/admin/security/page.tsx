@@ -34,11 +34,6 @@ export default function SecurityPage() {
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Check 2FA status on mount
-  useEffect(() => {
-    check2FAStatus();
-  }, []);
-
   const check2FAStatus = async () => {
     try {
       const res = await fetch("/api/admin/2fa/status");
@@ -52,6 +47,11 @@ export default function SecurityPage() {
       setLoading(false);
     }
   };
+
+  // Check 2FA status on mount
+  useEffect(() => {
+    check2FAStatus();
+  }, []);
 
   // Focus first input when verify step appears
   useEffect(() => {

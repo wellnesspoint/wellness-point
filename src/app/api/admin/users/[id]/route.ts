@@ -56,11 +56,33 @@ export async function PUT(
     const updateFields: any = {};
 
     if (body.isActive !== undefined) {
+      if (typeof body.isActive !== "boolean") {
+        return NextResponse.json({ error: "isActive must be a boolean" }, { status: 400 });
+      }
       updateFields.isActive = body.isActive;
     }
 
-    if (body.role) {
+    if (body.role !== undefined) {
+      if (body.role !== "user" && body.role !== "admin") {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      }
       updateFields.role = body.role;
+    }
+
+    // An admin must not lock themselves out (deactivate or demote their own
+    // account) — that would leave the store with no way back in.
+    if (
+      id === session.user.id &&
+      (updateFields.isActive === false || (updateFields.role && updateFields.role !== "admin"))
+    ) {
+      return NextResponse.json(
+        { error: "You cannot deactivate or demote your own account" },
+        { status: 400 }
+      );
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
     }
 
     const user = await User.findByIdAndUpdate(

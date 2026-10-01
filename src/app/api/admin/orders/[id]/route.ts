@@ -36,16 +36,22 @@ export async function PUT(
     }
 
     if (body.notes !== undefined) {
-      updateFields.notes = body.notes;
+      updateFields.notes = String(body.notes).slice(0, 2000);
     }
 
-    // Load the current order first — stock must only be restored ONCE, on
-    // the transition INTO cancelled/refunded, never on every save while it
-    // stays in that state (e.g. an admin editing notes on an already
-    // cancelled order shouldn't re-credit stock a second time).
     const existing = await Order.findById(id);
     if (!existing) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // "paid" can only be reached through a verified Razorpay payment (verify
+    // endpoint / webhook). Hand-setting it on a pending/failed order would mark
+    // it paid with no payment behind it and no stock taken.
+    if (updateFields.paymentStatus === "paid" && existing.paymentStatus !== "paid") {
+      return NextResponse.json(
+        { error: "Orders can only become paid through a verified payment" },
+        { status: 400 }
+      );
     }
 
     const enteringCancelled =
@@ -53,13 +59,22 @@ export async function PUT(
     const enteringRefunded =
       updateFields.paymentStatus === "refunded" && existing.paymentStatus !== "refunded";
 
-    if ((enteringCancelled || enteringRefunded) && !existing.stockRestored) {
-      for (const item of existing.items) {
-        await Product.findByIdAndUpdate(item.product, {
-          $inc: { stock: item.quantity },
-        });
+    // Stock was only ever taken for PAID orders — pending/failed orders never
+    // decremented it (or already rolled it back), so "restoring" it there would
+    // inflate inventory. The restore is claimed atomically (stockRestored flips
+    // false -> true exactly once) so a double-click can't credit it twice.
+    if ((enteringCancelled || enteringRefunded) && existing.paymentStatus === "paid") {
+      const claimed = await Order.findOneAndUpdate(
+        { _id: id, stockRestored: { $ne: true } },
+        { $set: { stockRestored: true } }
+      );
+      if (claimed) {
+        for (const item of existing.items) {
+          await Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: item.quantity },
+          });
+        }
       }
-      updateFields.stockRestored = true;
     }
 
     const order = await Order.findByIdAndUpdate(

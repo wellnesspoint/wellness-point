@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     // Rate limit: 5 attempts per 5 minutes per IP
     const ip = getClientIp(req);
-    const { success: withinLimit } = rateLimit(`admin-2fa:${ip}`, {
+    const { success: withinLimit } = await rateLimit(`admin-2fa:${ip}`, {
       limit: 5,
       windowMs: 5 * 60 * 1000,
     });
@@ -46,6 +46,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Session expired. Please login again." },
         { status: 401 }
+      );
+    }
+
+    // Also limit per ACCOUNT, not just per IP — a pending token is valid for 5
+    // minutes, and an attacker rotating IPs must not get unlimited TOTP guesses.
+    const { success: accountWithinLimit } = await rateLimit(`admin-2fa-user:${pending.id}`, {
+      limit: 5,
+      windowMs: 5 * 60 * 1000,
+    });
+    if (!accountWithinLimit) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again in 5 minutes." },
+        { status: 429 }
       );
     }
 
@@ -90,18 +103,26 @@ export async function POST(req: NextRequest) {
         .update(code.toUpperCase())
         .digest("hex");
 
-      const codeIndex = user.twoFactorBackupCodes.indexOf(hashedInput);
-      if (codeIndex !== -1) {
-        isValid = true;
-        usedBackupCode = true;
-        // Remove used backup code
-        const updatedCodes = [...user.twoFactorBackupCodes];
-        updatedCodes.splice(codeIndex, 1);
-        await User.findByIdAndUpdate(
-          pending.id,
-          { $set: { twoFactorBackupCodes: updatedCodes } },
-          { strict: false }
-        );
+      if (user.twoFactorBackupCodes.includes(hashedInput)) {
+        // Consume the code with an atomic $pull that only matches while the
+        // code is still present — two parallel requests with the same code
+        // can't both succeed (the second sees modifiedCount === 0).
+        const consumed = await mongoose.connection.db!
+          .collection("users")
+          .updateOne(
+            {
+              _id: new mongoose.Types.ObjectId(pending.id),
+              twoFactorBackupCodes: hashedInput,
+            },
+            { $pull: { twoFactorBackupCodes: hashedInput } as any }
+          );
+        if (consumed.modifiedCount === 1) {
+          isValid = true;
+          usedBackupCode = true;
+          user.twoFactorBackupCodes = user.twoFactorBackupCodes.filter(
+            (c: string) => c !== hashedInput
+          );
+        }
       }
     }
 

@@ -73,6 +73,12 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "facebook") {
+        // Facebook can return no email (phone-only accounts / denied scope);
+        // User.create would then throw a validation error mid-login.
+        if (!user.email) {
+          return "/login?error=oauth-no-email";
+        }
+
         await connectDB();
 
         const existingUser = await User.findOne({ email: user.email });
@@ -132,8 +138,18 @@ export const authOptions: NextAuthOptions = {
         const lastChecked = (token.lastChecked as number) || 0;
         if (Date.now() - lastChecked > FIVE_MINUTES) {
           await connectDB();
-          const dbUser = await User.findOne({ email: token.email }).select("isActive role").lean();
+          const dbUser = await User.findOne({ email: token.email })
+            .select("isActive role passwordChangedAt")
+            .lean();
           if (dbUser && !dbUser.isActive) {
+            return { ...token, isActive: false };
+          }
+          // Password was reset after this session was issued → kill the session.
+          if (
+            dbUser?.passwordChangedAt &&
+            typeof token.iat === "number" &&
+            token.iat * 1000 < dbUser.passwordChangedAt.getTime()
+          ) {
             return { ...token, isActive: false };
           }
           if (dbUser) {

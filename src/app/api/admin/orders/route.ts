@@ -9,7 +9,8 @@ export async function GET() {
     if (!session) return unauthorizedResponse();
 
     await connectDB();
-    const orders = await Order.find()
+    // Abandoned checkouts ("pending", never paid) are not real orders.
+    const orders = await Order.find({ paymentStatus: { $ne: "pending" } })
       .populate("user", "name email")
       .sort({ createdAt: -1 })
       .lean();

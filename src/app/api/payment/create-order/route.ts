@@ -6,7 +6,9 @@ import connectDB from "@/lib/db";
 import Product from "@/models/Product";
 import Order from "@/models/Order";
 import ShippingSettings from "@/models/ShippingSettings";
-import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
+import { computeShipping } from "@/lib/shipping";
+import { validateShippingAddress } from "@/lib/utils";
 
 /**
  * POST /api/payment/create-order
@@ -32,8 +34,8 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     // Rate limit: 10 order creation attempts per 15 minutes per user
-    const ip = getClientIp(req);
-    const { success: withinLimit } = rateLimit(`create-order:${ip}`, {
+    const userId = (session.user as any).id as string;
+    const { success: withinLimit } = await rateLimit(`create-order:${userId}`, {
       limit: 10,
       windowMs: 15 * 60 * 1000,
     });
@@ -44,7 +46,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { items } = await req.json();
+    const { items, shippingAddress } = await req.json();
+
+    // Validate the address now (not only at verify time) so it is stored on the
+    // pending order — that lets the Razorpay webhook finalize the order even if
+    // the customer never returns to the site after paying.
+    const validatedAddress = validateShippingAddress(shippingAddress || {});
+    if (!validatedAddress.valid) {
+      return NextResponse.json({ error: validatedAddress.error }, { status: 400 });
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -105,7 +115,11 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const unitPrice = product.discountPrice ?? product.price;
+      // A discount only applies when it is a real, lower, non-zero price.
+      const unitPrice =
+        product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price
+          ? product.discountPrice
+          : product.price;
       subtotal += unitPrice * requestedQty;
 
       validatedItems.push({
@@ -117,22 +131,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Shipping — use admin settings
-    let shipping = 50; // fallback
+    // Shipping — admin settings, with one shared fallback (see lib/shipping.ts)
+    let shippingConfig = null;
     try {
-      const shippingConfig = await ShippingSettings.findOne().lean() as { enableFreeShipping?: boolean; freeShippingThreshold?: number; flatRate?: number } | null;
-      if (shippingConfig) {
-        if (shippingConfig.enableFreeShipping && subtotal >= (shippingConfig.freeShippingThreshold ?? 999)) {
-          shipping = 0;
-        } else {
-          shipping = shippingConfig.flatRate ?? 50;
-        }
-      } else {
-        shipping = subtotal >= 999 ? 0 : 99;
-      }
+      shippingConfig = await ShippingSettings.findOne().lean();
     } catch {
-      shipping = subtotal >= 999 ? 0 : 99;
+      // fall through to defaults
     }
+    const shipping = computeShipping(subtotal, shippingConfig as any);
     const total = Math.round((subtotal + shipping) * 100) / 100;
 
     if (total < 1) {
@@ -145,7 +151,7 @@ export async function POST(req: NextRequest) {
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
       notes: {
-        userId: (session.user as any).id,
+        userId,
         itemCount: validatedItems.length.toString(),
       },
     };
@@ -156,8 +162,9 @@ export async function POST(req: NextRequest) {
     // /api/payment/verify will only ever trust THIS record — never client-resent
     // cart data — when finalizing the order after payment.
     await Order.create({
-      user: (session.user as any).id,
+      user: userId,
       items: validatedItems,
+      shippingAddress: validatedAddress.address,
       subtotal,
       shipping,
       discount: 0,

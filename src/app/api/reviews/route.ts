@@ -5,6 +5,7 @@ import Product from "@/models/Product";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import mongoose from "mongoose";
 
 // GET /api/reviews?productId=xxx — get approved reviews for a product
 export async function GET(req: NextRequest) {
@@ -13,9 +14,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get("productId");
 
-    if (!productId) {
+    if (!productId || !mongoose.isValidObjectId(productId)) {
       return NextResponse.json(
-        { error: "productId is required" },
+        { error: "A valid productId is required" },
         { status: 400 }
       );
     }
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     // Rate limit: 5 reviews per 15 minutes per IP
     const ip = getClientIp(req);
-    const { success: withinLimit } = rateLimit(`review:${ip}`, {
+    const { success: withinLimit } = await rateLimit(`review:${ip}`, {
       limit: 5,
       windowMs: 15 * 60 * 1000,
     });
@@ -71,7 +72,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (rating < 1 || rating > 5) {
+    const numericRating = Math.round(Number(rating));
+    if (
+      !mongoose.isValidObjectId(productId) ||
+      typeof title !== "string" ||
+      typeof content !== "string"
+    ) {
+      return NextResponse.json({ error: "Invalid review data" }, { status: 400 });
+    }
+    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
       return NextResponse.json(
         { error: "Rating must be between 1 and 5" },
         { status: 400 }
@@ -89,14 +98,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // One review per customer per product.
+    const alreadyReviewed = await Review.exists({
+      product: productId,
+      user: (session.user as any).id,
+    });
+    if (alreadyReviewed) {
+      return NextResponse.json(
+        { error: "You have already reviewed this product" },
+        { status: 409 }
+      );
+    }
+
     const review = await Review.create({
       product: productId,
       user: (session.user as any).id,
       name: session.user.name || "Anonymous",
       email: session.user.email || "",
-      rating: Number(rating),
-      title: title.slice(0, 120),
-      content: content.slice(0, 1000),
+      rating: numericRating,
+      title: title.trim().slice(0, 120),
+      content: content.trim().slice(0, 1000),
       isApproved: false, // requires admin approval
     });
 

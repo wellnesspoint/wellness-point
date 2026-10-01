@@ -1,29 +1,13 @@
 /**
- * In-memory rate limiter for API routes.
+ * Rate limiter for API routes.
  *
- * Uses a sliding window approach. Each unique key (usually IP address)
- * is allowed `limit` requests per `windowMs` milliseconds.
- *
- * Note: This is per-process. In a multi-instance deployment (e.g. serverless),
- * consider using Redis-based rate limiting instead.
+ * State lives in MongoDB (atomic `$inc` on one document per key), so limits
+ * hold across serverless instances — the old in-memory Map reset per instance
+ * and was effectively useless on Vercel. If the database is unreachable we
+ * fall back to a per-process in-memory window rather than failing the request.
  */
-
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
-
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-// Clean up expired entries every 60 seconds
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (now > entry.resetTime) {
-      rateLimitStore.delete(key);
-    }
-  }
-}, 60_000);
+import connectDB from "./db";
+import RateLimit from "@/models/RateLimit";
 
 interface RateLimitOptions {
   /** Maximum number of requests per window */
@@ -39,70 +23,101 @@ interface RateLimitResult {
   resetTime: number;
 }
 
-/**
- * Check rate limit for a given key.
- *
- * @example
- * ```ts
- * const ip = req.headers.get("x-forwarded-for") || "unknown";
- * const { success, remaining } = rateLimit(`login:${ip}`, { limit: 5, windowMs: 15 * 60 * 1000 });
- * if (!success) {
- *   return NextResponse.json({ error: "Too many requests" }, { status: 429 });
- * }
- * ```
- */
-export function rateLimit(
-  key: string,
-  options: RateLimitOptions
-): RateLimitResult {
+// ── In-memory fallback ────────────────────────────────────────────────
+const memoryStore = new Map<string, { count: number; resetTime: number }>();
+
+function memoryLimit(key: string, { limit, windowMs }: RateLimitOptions): RateLimitResult {
   const now = Date.now();
-  const entry = rateLimitStore.get(key);
-
+  // opportunistic cleanup so the map can't grow unbounded
+  if (memoryStore.size > 5000) {
+    for (const [k, v] of memoryStore) if (now > v.resetTime) memoryStore.delete(k);
+  }
+  const entry = memoryStore.get(key);
   if (!entry || now > entry.resetTime) {
-    // New window
-    rateLimitStore.set(key, {
-      count: 1,
-      resetTime: now + options.windowMs,
-    });
-    return {
-      success: true,
-      limit: options.limit,
-      remaining: options.limit - 1,
-      resetTime: now + options.windowMs,
-    };
+    memoryStore.set(key, { count: 1, resetTime: now + windowMs });
+    return { success: true, limit, remaining: limit - 1, resetTime: now + windowMs };
   }
-
   entry.count++;
-
-  if (entry.count > options.limit) {
-    return {
-      success: false,
-      limit: options.limit,
-      remaining: 0,
-      resetTime: entry.resetTime,
-    };
-  }
-
   return {
-    success: true,
-    limit: options.limit,
-    remaining: options.limit - entry.count,
+    success: entry.count <= limit,
+    limit,
+    remaining: Math.max(0, limit - entry.count),
     resetTime: entry.resetTime,
   };
 }
 
 /**
+ * Check (and consume) one request against `key`.
+ *
+ * @example
+ * const { success } = await rateLimit(`login:${ip}`, { limit: 5, windowMs: 15 * 60 * 1000 });
+ */
+export async function rateLimit(
+  key: string,
+  options: RateLimitOptions
+): Promise<RateLimitResult> {
+  const { limit, windowMs } = options;
+  try {
+    await connectDB();
+
+    // Each step is a single atomic operation, so concurrent requests can never
+    // both "start" a window or both reset a counter:
+    //   1. bump the counter of an ACTIVE window;
+    //   2. else take over an EXPIRED window (only one caller can match it,
+    //      because the winner moves resetAt into the future);
+    //   3. else insert a brand-new window (the unique _id makes a racing
+    //      duplicate fail, and the loser loops back to step 1).
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const now = new Date();
+      const resetAt = new Date(now.getTime() + windowMs);
+
+      const active = await RateLimit.findOneAndUpdate(
+        { _id: key, resetAt: { $gt: now } },
+        { $inc: { count: 1 } },
+        { new: true }
+      ).lean();
+      if (active) {
+        return {
+          success: active.count <= limit,
+          limit,
+          remaining: Math.max(0, limit - active.count),
+          resetTime: active.resetAt.getTime(),
+        };
+      }
+
+      const reclaimed = await RateLimit.findOneAndUpdate(
+        { _id: key, resetAt: { $lte: now } },
+        { $set: { count: 1, resetAt } }
+      ).lean();
+      if (reclaimed) {
+        return { success: true, limit, remaining: limit - 1, resetTime: resetAt.getTime() };
+      }
+
+      try {
+        await RateLimit.create({ _id: key, count: 1, resetAt });
+        return { success: true, limit, remaining: limit - 1, resetTime: resetAt.getTime() };
+      } catch (err: any) {
+        if (err?.code !== 11000) throw err;
+        // lost the creation race — retry and count against the winner's window
+      }
+    }
+    throw new Error("rate limiter could not settle on a window");
+  } catch (err) {
+    console.error("Rate limiter DB error, using in-memory fallback:", err);
+    return memoryLimit(key, options);
+  }
+}
+
+/** Synchronous in-memory limiter, exported for tests. */
+export const __memoryLimit = memoryLimit;
+
+/**
  * Helper to extract client IP from request.
  *
- * IMPORTANT: never trust the FIRST entry of X-Forwarded-For — a client can
- * send their own XFF header, and if the platform proxy appends (rather than
- * replaces) it, `split(",")[0]` returns attacker-controlled text, letting
- * anyone bypass rate limiting by sending a different fake value per request.
- *
- * On Vercel, `x-vercel-forwarded-for` is set by Vercel's edge network itself
- * and cannot be spoofed by the client, so it's preferred when present. As a
- * fallback, we take the LAST entry of X-Forwarded-For — the hop closest to
- * our server, which the proxy chain appends and a client can't overwrite.
+ * Never trust the FIRST entry of X-Forwarded-For — a client can send its own
+ * header, and a different fake value per request defeats any IP-keyed limit.
+ * `x-vercel-forwarded-for` is set by Vercel's edge and can't be spoofed; as a
+ * fallback we take the LAST XFF entry (appended by the closest proxy).
  */
 export function getClientIp(req: Request): string {
   const vercelIp = req.headers.get("x-vercel-forwarded-for");

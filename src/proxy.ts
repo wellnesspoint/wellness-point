@@ -1,31 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-
-// ── In-memory rate limiter for login attempts ──
-const loginAttempts = new Map<string, { count: number; resetTime: number }>();
-
-function checkLoginRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = loginAttempts.get(ip);
-
-  if (!entry || now > entry.resetTime) {
-    loginAttempts.set(ip, { count: 1, resetTime: now + 15 * 60 * 1000 });
-    return true;
-  }
-
-  entry.count++;
-  return entry.count <= 10; // 10 attempts per 15 minutes
-}
-
-// Cleanup stale entries periodically
-if (typeof setInterval !== "undefined") {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of loginAttempts.entries()) {
-      if (now > entry.resetTime) loginAttempts.delete(key);
-    }
-  }, 5 * 60 * 1000);
-}
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 /**
  * Centralized proxy for route protection + login rate limiting.
@@ -40,12 +15,15 @@ export async function proxy(req: NextRequest) {
 
   // ─── Rate limit login attempts ────────────────────────────────────
   if (pathname === "/api/auth/callback/credentials") {
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "unknown";
+    // Shared DB-backed limiter + spoof-resistant IP (the first X-Forwarded-For
+    // entry is client-controlled, so it must not key the limit).
+    const ip = getClientIp(req);
+    const { success: allowed } = await rateLimit(`login:${ip}`, {
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    });
 
-    if (!checkLoginRateLimit(ip)) {
+    if (!allowed) {
       return NextResponse.json(
         { error: "Too many login attempts. Please try again later." },
         { status: 429 }

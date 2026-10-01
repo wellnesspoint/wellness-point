@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   try {
     // Rate limit: 3 requests per 15 min per IP
     const ip = getClientIp(req);
-    const { success } = rateLimit(`forgot-password:${ip}`, {
+    const { success } = await rateLimit(`forgot-password:${ip}`, {
       limit: 3,
       windowMs: 15 * 60 * 1000,
     });

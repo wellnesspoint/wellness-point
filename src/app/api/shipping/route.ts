@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import ShippingSettings from "@/models/ShippingSettings";
+import { DEFAULT_SHIPPING } from "@/lib/shipping";
 
 /**
  * GET /api/shipping — public endpoint for shipping settings.
@@ -13,9 +14,7 @@ export async function GET() {
     const raw = await ShippingSettings.findOne().lean() as ShippingConfig | null;
 
     const settings: ShippingConfig = raw ?? {
-      flatRate: 50,
-      freeShippingThreshold: 499,
-      enableFreeShipping: true,
+      ...DEFAULT_SHIPPING,
       estimatedDays: 5,
       estimatedDaysMax: 7,
       shippingNote: "Ships within 2-3 business days",
@@ -32,7 +31,7 @@ export async function GET() {
   } catch (error) {
     console.error("Shipping settings public GET error:", error);
     return NextResponse.json(
-      { flatRate: 50, freeShippingThreshold: 499, enableFreeShipping: true },
+      DEFAULT_SHIPPING,
       { status: 200 }
     );
   }

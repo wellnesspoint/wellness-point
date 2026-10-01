@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const featured = searchParams.get("featured");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    // Clamp: NaN / negative / huge values would otherwise reach .limit()
+    const parsedLimit = parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 20, 1), 50);
 
     const filter: any = { isActive: true };
     if (featured === "true") filter.isFeatured = true;

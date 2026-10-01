@@ -31,6 +31,8 @@ export interface IOrder extends Document {
   razorpayPaymentId?: string;
   razorpaySignature?: string;
   stockRestored?: boolean;
+  finalizing?: boolean;
+  finalizingAt?: Date;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -83,7 +85,11 @@ const orderSchema = new Schema<IOrder>(
     // Set once stock has been returned to inventory for a cancelled/refunded order,
     // so admin re-saves (or repeated status transitions) never double-restore it.
     stockRestored: { type: Boolean, default: false },
-    notes: { type: String },
+    // Short-lived claim taken while a payment is being finalized, so verify and
+    // the webhook can never both process the same order.
+    finalizing: { type: Boolean, default: false },
+    finalizingAt: { type: Date },
+    notes: { type: String, maxlength: 2000 },
   },
   {
     timestamps: true,
@@ -91,6 +97,13 @@ const orderSchema = new Schema<IOrder>(
 );
 
 orderSchema.index({ user: 1, createdAt: -1 });
+// Abandoned checkouts (a "pending" order is created before payment) are
+// purged after 7 days instead of accumulating forever. Paid/failed/refunded
+// orders are never touched (partial filter).
+orderSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 7 * 24 * 60 * 60, partialFilterExpression: { paymentStatus: "pending" } }
+);
 
 const Order: Model<IOrder> =
   mongoose.models.Order || mongoose.model<IOrder>("Order", orderSchema);

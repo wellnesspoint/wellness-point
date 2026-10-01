@@ -29,6 +29,7 @@ export interface IUser extends Document {
   twoFactorSecret?: string;
   twoFactorEnabled: boolean;
   twoFactorBackupCodes?: string[];
+  passwordChangedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,6 +78,8 @@ const userSchema = new Schema<IUser>(
     twoFactorSecret: { type: String, select: false },
     twoFactorEnabled: { type: Boolean, default: false },
     twoFactorBackupCodes: { type: [String], select: false },
+    // Sessions issued before this moment are rejected (set on password reset).
+    passwordChangedAt: { type: Date },
   },
   {
     timestamps: true,

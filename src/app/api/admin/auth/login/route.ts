@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     try {
         // Rate limit: 5 login attempts per 15 minutes per IP
         const ip = getClientIp(req);
-        const { success: withinLimit } = rateLimit(`admin-login:${ip}`, {
+        const { success: withinLimit } = await rateLimit(`admin-login:${ip}`, {
             limit: 5,
             windowMs: 15 * 60 * 1000,
         });
@@ -26,6 +26,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 { error: "Email and password are required" },
                 { status: 400 }
+            );
+        }
+
+        // Per-account limit too, so rotating IPs can't brute-force one admin.
+        const { success: accountWithinLimit } = await rateLimit(
+            `admin-login-user:${String(email).toLowerCase()}`,
+            { limit: 10, windowMs: 15 * 60 * 1000 }
+        );
+        if (!accountWithinLimit) {
+            return NextResponse.json(
+                { error: "Too many login attempts. Please try again in 15 minutes." },
+                { status: 429 }
             );
         }
 
@@ -63,7 +75,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Check if 2FA is enabled (and not bypassed via env)
-        const bypass2FA = process.env.DISABLE_ADMIN_2FA === "true";
+        // The bypass flag is a dev convenience only — it is ignored in
+        // production so a forgotten env var can never silently disable 2FA.
+        const bypass2FA =
+            process.env.DISABLE_ADMIN_2FA === "true" && process.env.NODE_ENV !== "production";
         if (user.twoFactorEnabled && !bypass2FA) {
             // Return a short-lived pending token — client must verify TOTP next
             const pendingToken = signPending2FAToken({

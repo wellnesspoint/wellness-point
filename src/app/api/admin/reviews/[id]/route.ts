@@ -17,13 +17,22 @@ export async function PUT(req: NextRequest, { params }: Props) {
     const { id } = await params;
     const body = await req.json();
 
-    // Auto-set adminRepliedAt when adminReply is provided
-    if (body.adminReply) {
-      body.adminRepliedAt = new Date();
+    // Whitelist moderation fields only — passing the raw body straight to the
+    // update let a request rewrite product/user/rating/etc. (mass assignment).
+    const update: Record<string, unknown> = {};
+    if (typeof body.isApproved === "boolean") update.isApproved = body.isApproved;
+    if (typeof body.adminReply === "string") {
+      update.adminReply = body.adminReply.slice(0, 1000);
+      // Auto-set adminRepliedAt when a reply is provided
+      if (body.adminReply.trim()) update.adminRepliedAt = new Date();
+    }
+
+    if (Object.keys(update).length === 0) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
     }
 
     await connectDB();
-    const review = await Review.findByIdAndUpdate(id, body, { new: true });
+    const review = await Review.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true });
 
     if (!review) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
