@@ -21,7 +21,7 @@ export async function GET() {
       path: "products",
       // Archived/inactive products are hidden from the store, so from wishlists too.
       match: { isActive: true },
-      select: "name slug price discountPrice images shortDescription rating reviewCount stock",
+      select: "name slug price discountPrice images shortDescription rating reviewCount stock variants",
     }).lean();
 
     // A referenced product may have since been deleted — populate() leaves a

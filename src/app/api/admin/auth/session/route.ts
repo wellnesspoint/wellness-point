@@ -15,6 +15,7 @@ export async function GET() {
             name: admin.name,
             email: admin.email,
             role: admin.role,
+            adminRole: admin.adminRole,
         },
     });
 }

@@ -15,9 +15,15 @@ import toast from "react-hot-toast";
 
 type Step = "status" | "qr" | "verify" | "backup" | "disable";
 
+import { useConfirm } from "@/components/admin/ConfirmProvider";
+
 export default function SecurityPage() {
+  const confirm = useConfirm();
   const [step, setStep] = useState<Step>("status");
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [backupCodesLeft, setBackupCodesLeft] = useState<number | null>(null);
+  const [regenCode, setRegenCode] = useState("");
+  const [showRegen, setShowRegen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -40,6 +46,7 @@ export default function SecurityPage() {
       const data = await res.json();
       if (res.ok) {
         setIs2FAEnabled(data.enabled);
+        setBackupCodesLeft(data.enabled ? data.backupCodesLeft ?? 0 : null);
       }
     } catch {
       toast.error("Failed to check 2FA status");
@@ -134,6 +141,44 @@ export default function SecurityPage() {
     }
   };
 
+  const handleRegenerate = async () => {
+    if (!/^\d{6}$/.test(regenCode.trim())) {
+      toast.error("Enter the 6-digit code from your authenticator app");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/2fa/backup-codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: regenCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setBackupCodes(data.backupCodes);
+      setBackupCodesLeft(data.backupCodes.length);
+      setRegenCode("");
+      setShowRegen(false);
+      setStep("backup");
+      toast.success("New backup codes created. The old ones no longer work.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not create backup codes");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    if (!(await confirm("Sign out of the admin panel on every device, including this one?", { confirmLabel: "Sign out everywhere", title: "Sign out of all devices" }))) return;
+    try {
+      const res = await fetch("/api/admin/auth/logout-all", { method: "POST" });
+      if (!res.ok) throw new Error();
+      window.location.href = "/admin/login";
+    } catch {
+      toast.error("Could not sign out everywhere");
+    }
+  };
+
   const handleDisable = async () => {
     if (!disableCode.trim()) {
       toast.error("Enter your authenticator or backup code");
@@ -223,12 +268,52 @@ export default function SecurityPage() {
 
               <div className="mt-4">
                 {is2FAEnabled ? (
-                  <button
-                    onClick={() => setStep("disable")}
-                    className="rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors"
-                  >
-                    Disable 2FA
-                  </button>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Backup codes left:{" "}
+                      <span className={backupCodesLeft !== null && backupCodesLeft <= 2 ? "font-semibold text-amber-600" : "font-semibold text-foreground"}>
+                        {backupCodesLeft ?? "…"}
+                      </span>
+                      {backupCodesLeft !== null && backupCodesLeft <= 2 && " — generate new ones soon"}
+                    </p>
+                    {showRegen ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={regenCode}
+                          onChange={(e) => setRegenCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          inputMode="numeric"
+                          placeholder="6-digit code"
+                          aria-label="Authenticator code"
+                          className="h-10 w-36 rounded-lg border bg-background px-3 text-sm"
+                        />
+                        <button
+                          onClick={handleRegenerate}
+                          disabled={actionLoading}
+                          className="h-10 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          Create new codes
+                        </button>
+                        <button onClick={() => setShowRegen(false)} className="h-10 px-3 text-sm text-muted-foreground hover:text-foreground">
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setShowRegen(true)}
+                          className="rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+                        >
+                          New backup codes
+                        </button>
+                        <button
+                          onClick={() => setStep("disable")}
+                          className="rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors"
+                        >
+                          Disable 2FA
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <button
                     onClick={handleSetup}
@@ -246,6 +331,21 @@ export default function SecurityPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {step === "status" && (
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h3 className="text-lg font-semibold text-foreground">Signed in on other devices?</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Lost a phone or used a shared computer? This signs your admin account out everywhere, including here.
+          </p>
+          <button
+            onClick={handleLogoutAll}
+            className="mt-4 rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            Sign out of all devices
+          </button>
         </div>
       )}
 

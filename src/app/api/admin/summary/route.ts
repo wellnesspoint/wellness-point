@@ -15,7 +15,7 @@ const UNSHIPPED_AFTER_MS = 48 * 60 * 60 * 1000;
  */
 export async function GET() {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("dashboard", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();

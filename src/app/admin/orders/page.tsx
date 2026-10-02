@@ -10,9 +10,6 @@ import {
   Search,
   Download,
   Package,
-  Truck,
-  CheckCircle,
-  XCircle,
   Clock,
   Eye,
   ArrowLeft,
@@ -24,149 +21,18 @@ import toast from "react-hot-toast";
 import Pagination, { useDebounced } from "@/components/admin/Pagination";
 import { calcOrderTotal } from "@/lib/order-math";
 import { downloadCsv } from "@/lib/csv";
-import type { CompanyInfo } from "@/lib/invoice-core";
+import { COURIERS, trackingUrlFor } from "@/lib/couriers";
+
 import {
-  ORDER_STATUSES,
-  ORDER_STATUS_TRANSITIONS,
-  PAYMENT_STATUSES,
-  PAYMENT_STATUS_TRANSITIONS,
-  allowedNext,
-  type OrderStatus,
-  type PaymentStatus,
-} from "@/lib/order-status";
-
-interface OrderItem {
-  product: string;
-  name: string;
-  image: string;
-  price: number;
-  quantity: number;
-}
-
-interface Order {
-  _id: string;
-  user?: { _id: string; name: string; email: string };
-  items: OrderItem[];
-  shippingAddress: {
-    fullName: string;
-    email?: string;
-    phone: string;
-    street: string;
-    addressLine2?: string;
-    city: string;
-    state: string;
-    pincode: string;
-  };
-  subtotal: number;
-  shipping: number;
-  discount: number;
-  total: number;
-  paymentStatus: string;
-  orderStatus: string;
-  razorpayOrderId?: string;
-  razorpayPaymentId?: string;
-  couponCode?: string;
-  tracking?: { courier?: string; trackingNumber?: string; trackingUrl?: string };
-  statusHistory?: { field: string; from?: string; to: string; by?: string; at: string }[];
-  internalNotes?: { text: string; by?: string; at: string }[];
-  refunds?: { amount: number; reason?: string; by?: string; at: string }[];
-  refundedAmount?: number;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-const orderStatusOptions: string[] = ORDER_STATUSES;
-
-// Only legal next states are selectable (the API enforces the same rules).
-const nextOrderStatuses = (current: string) =>
-  allowedNext(ORDER_STATUS_TRANSITIONS, current as OrderStatus, ORDER_STATUSES);
-const nextPaymentStatuses = (current: string) =>
-  allowedNext(PAYMENT_STATUS_TRANSITIONS, current as PaymentStatus, PAYMENT_STATUSES);
-
-const statusColor: Record<string, string> = {
-  processing: "bg-blue-100 text-blue-700",
-  confirmed: "bg-cyan-100 text-cyan-700",
-  shipped: "bg-purple-100 text-purple-700",
-  delivered: "bg-green-100 text-green-700",
-  cancelled: "bg-red-100 text-red-700",
-  paid: "bg-green-100 text-green-700",
-  pending: "bg-yellow-100 text-yellow-700",
-  failed: "bg-red-100 text-red-700",
-  refunded: "bg-orange-100 text-orange-700",
-};
-
-const statusIcon: Record<string, any> = {
-  processing: Clock,
-  confirmed: CheckCircle,
-  shipped: Truck,
-  delivered: CheckCircle,
-  cancelled: XCircle,
-};
-
-// ——— Invoice PDF (layout shared with the emailed invoice: lib/invoice-core) ———
-async function downloadInvoices(list: Order[]) {
-  if (list.length === 0) return;
-  const [{ jsPDF }, { renderInvoice }] = await Promise.all([
-    import("jspdf"),
-    import("@/lib/invoice-core"),
-  ]);
-
-  // Load logo as base64 (skipped if it fails)
-  let logoBase64: string | null = null;
-  try {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject();
-      img.src = "/logo.png";
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    canvas.getContext("2d")?.drawImage(img, 0, 0);
-    logoBase64 = canvas.toDataURL("image/png");
-  } catch {
-    // no logo
-  }
-
-  // Store name / GSTIN / address come from Admin → Settings (falls back to defaults).
-  let company: CompanyInfo | undefined;
-  try {
-    const res = await fetch("/api/admin/settings");
-    if (res.ok) company = (await res.json()).settings;
-  } catch {
-    // use defaults
-  }
-
-  // One page per order (invoice on top, shipping label below).
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  list.forEach((order, i) => {
-    if (i > 0) doc.addPage();
-    renderInvoice(
-      doc,
-      {
-        ...order,
-        email: order.shippingAddress?.email || order.user?.email,
-        userName: order.user?.name,
-      },
-      { logoBase64, includeShippingLabel: true, company }
-    );
-  });
-
-  // Save with data URI to ensure Chrome uses correct filename
-  const link = document.createElement("a");
-  link.href = doc.output("datauristring");
-  link.download =
-    list.length === 1
-      ? `Invoice-WP-${list[0]._id.slice(-8).toUpperCase()}.pdf`
-      : `Invoices-${list.length}-orders-${new Date().toISOString().slice(0, 10)}.pdf`;
-  link.click();
-  toast.success(list.length === 1 ? "Invoice downloaded" : `${list.length} invoices downloaded`);
-}
-
-const downloadInvoice = (order: Order) => downloadInvoices([order]);
+  statusColor,
+  statusIcon,
+  nextOrderStatuses,
+  nextPaymentStatuses,
+  orderStatusOptions,
+  type Order,
+} from "./order-types";
+import { downloadInvoices, downloadInvoice, downloadPackingSlips } from "./documents";
+import MobileOrderCards from "./MobileOrderCards";
 
 const PAGE_SIZE = 25;
 
@@ -411,6 +277,41 @@ export default function AdminOrdersPage() {
     }
   };
 
+  // Shiprocket (only offered when the server has credentials configured)
+  const [shipInfo, setShipInfo] = useState<{ configured: boolean; shipment: { awb?: string } | null } | null>(null);
+  const [creatingShipment, setCreatingShipment] = useState(false);
+  const shipOrderId = selectedOrder?._id;
+  useEffect(() => {
+    setShipInfo(null);
+    if (!shipOrderId) return;
+    fetch(`/api/admin/orders/${shipOrderId}/shipment`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setShipInfo(d))
+      .catch(() => {});
+  }, [shipOrderId]);
+
+  const createShipment = async () => {
+    if (!selectedOrder) return;
+    setCreatingShipment(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${selectedOrder._id}/shipment`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not create the shipment");
+      toast.success(data.message || "Shipment created");
+      const c = data.shipment;
+      if (c?.awb) {
+        const tracking = { courier: c.courier || "Shiprocket", trackingNumber: c.awb, trackingUrl: c.trackingUrl || "" };
+        setTrackingForm(tracking);
+        setSelectedOrder((prev) => (prev ? { ...prev, tracking } : prev));
+      }
+      setShipInfo({ configured: true, shipment: { awb: c?.awb } });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create the shipment");
+    } finally {
+      setCreatingShipment(false);
+    }
+  };
+
   const saveTracking = async () => {
     if (!selectedOrder) return;
     setSavingTracking(true);
@@ -639,7 +540,13 @@ export default function AdminOrdersPage() {
                     onChange={(e) => setTrackingForm({ ...trackingForm, courier: e.target.value })}
                     placeholder="e.g. DTDC, Delhivery"
                     maxLength={80}
+                    list="courier-presets"
                   />
+                  <datalist id="courier-presets">
+                    {COURIERS.map((c) => (
+                      <option key={c.name} value={c.name} />
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-muted-foreground">Tracking number</label>
@@ -655,15 +562,31 @@ export default function AdminOrdersPage() {
                   <Input
                     value={trackingForm.trackingUrl}
                     onChange={(e) => setTrackingForm({ ...trackingForm, trackingUrl: e.target.value })}
-                    placeholder="https://..."
+                    placeholder="Auto-filled for known couriers"
                     maxLength={500}
                   />
+                  {!trackingForm.trackingUrl && trackingUrlFor(trackingForm.courier, trackingForm.trackingNumber) && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Leave empty to use the {trackingForm.courier} tracking page automatically.
+                    </p>
+                  )}
                 </div>
                 {o.orderStatus === "shipped" && (
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <input type="checkbox" checked={notifyCustomer} onChange={(e) => setNotifyCustomer(e.target.checked)} />
                     Email the customer if the tracking details changed
                   </label>
+                )}
+                {shipInfo?.configured && o.paymentStatus === "paid" && o.orderStatus !== "cancelled" && (
+                  shipInfo.shipment ? (
+                    <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                      Shiprocket shipment created{shipInfo.shipment.awb ? ` · AWB ${shipInfo.shipment.awb}` : ""}
+                    </p>
+                  ) : (
+                    <Button size="sm" variant="wellness" onClick={createShipment} disabled={creatingShipment} className="w-full">
+                      {creatingShipment ? "Creating shipment..." : "Create Shiprocket shipment"}
+                    </Button>
+                  )
                 )}
                 <Button size="sm" variant="outline" onClick={saveTracking} disabled={savingTracking} className="w-full">
                   {savingTracking ? "Saving..." : "Save tracking"}
@@ -920,6 +843,9 @@ export default function AdminOrdersPage() {
               <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkUpdate("delivered")}>
                 Mark delivered
               </Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => downloadPackingSlips(selectedOrders)}>
+                <FileText className="mr-1 h-4 w-4" /> Packing slips (4/sheet)
+              </Button>
               <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => downloadInvoices(selectedOrders)}>
                 <FileText className="mr-1 h-4 w-4" /> Print invoices &amp; labels
               </Button>
@@ -929,7 +855,17 @@ export default function AdminOrdersPage() {
             </div>
           </div>
         )}
-        <div className="overflow-x-auto">
+        <MobileOrderCards
+          orders={orders}
+          selected={selected}
+          allOnPageSelected={allOnPageSelected}
+          updating={updating}
+          onToggleAll={toggleSelectAll}
+          onToggle={toggleSelect}
+          onStatusChange={updateOrderStatus}
+          onOpen={setSelectedOrder}
+        />
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">

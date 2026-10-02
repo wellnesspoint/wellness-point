@@ -11,3 +11,5 @@ export { default as Coupon } from "./Coupon";
 export { default as StockMovement } from "./StockMovement";
 export { default as SiteSettings } from "./SiteSettings";
 export { default as NewsletterCampaign } from "./NewsletterCampaign";
+export { default as Category } from "./Category";
+export { default as Redirect } from "./Redirect";

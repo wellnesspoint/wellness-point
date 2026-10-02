@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Pencil, Plus, Ticket, Trash2, X } from "lucide-react";
+import { Download, Pencil, Plus, Ticket, Trash2, X } from "lucide-react";
+import { downloadCsv } from "@/lib/csv";
 import toast from "react-hot-toast";
 
 interface CouponItem {
@@ -60,6 +61,42 @@ export default function AdminCouponsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const toggleChecked = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const bulk = async (action: "enable" | "disable" | "delete") => {
+    if (checked.size === 0) return;
+    if (
+      action === "delete" &&
+      !(await confirm(`Delete ${checked.size} coupon(s)? Past orders keep their discount. This cannot be undone.`))
+    )
+      return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/coupons/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...checked], action }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Bulk action failed");
+      toast.success(`${d.affected} coupon(s) updated`);
+      setChecked(new Set());
+      fetchCoupons();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bulk action failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const fetchCoupons = useCallback(async () => {
     try {
@@ -139,6 +176,17 @@ export default function AdminCouponsPage() {
     }
   };
 
+  const exportCsv = () =>
+    downloadCsv(
+      `coupons-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["Code", "Type", "Value", "Min order", "Max discount", "Total uses allowed", "Per customer", "Starts", "Expires", "Active", "Times used", "Discount given"],
+      coupons.map((c) => [
+        c.code, c.type, c.value, c.minOrder, c.maxDiscount, c.usageLimit, c.perUserLimit,
+        c.startsAt ? c.startsAt.slice(0, 10) : "", c.expiresAt ? c.expiresAt.slice(0, 10) : "",
+        c.isActive ? "yes" : "no", c.uses, c.discountGiven,
+      ])
+    );
+
   const toggleActive = async (c: CouponItem) => {
     try {
       const res = await fetch(`/api/admin/coupons/${c._id}`, {
@@ -187,11 +235,16 @@ export default function AdminCouponsPage() {
             Discount codes customers enter at checkout. Uses count paid, non-cancelled orders.
           </p>
         </div>
-        {!showForm && (
-          <Button variant="wellness" onClick={openNew}>
-            <Plus className="mr-1 h-4 w-4" /> New coupon
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCsv} disabled={coupons.length === 0}>
+            <Download className="mr-1 h-4 w-4" /> CSV
           </Button>
-        )}
+          {!showForm && (
+            <Button variant="wellness" onClick={openNew}>
+              <Plus className="mr-1 h-4 w-4" /> New coupon
+            </Button>
+          )}
+        </div>
       </div>
 
       {showForm && (
@@ -297,6 +350,16 @@ export default function AdminCouponsPage() {
         </Card>
       )}
 
+      {checked.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-2 text-sm">
+          <span className="px-1 font-medium">{checked.size} selected</span>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("enable")}>Enable</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("disable")}>Disable</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("delete")}>Delete</Button>
+          <Button size="sm" variant="ghost" onClick={() => setChecked(new Set())}>Clear</Button>
+        </div>
+      )}
+
       {coupons.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="py-12 text-center">
@@ -311,6 +374,13 @@ export default function AdminCouponsPage() {
             return (
               <Card key={c._id} className="border-0 shadow-sm">
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                  <input
+                    type="checkbox"
+                    checked={checked.has(c._id)}
+                    onChange={() => toggleChecked(c._id)}
+                    aria-label={`Select coupon ${c.code}`}
+                    className="h-4 w-4 shrink-0"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-base font-bold text-foreground">{c.code}</span>

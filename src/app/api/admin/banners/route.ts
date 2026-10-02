@@ -8,7 +8,7 @@ import { logAudit } from "@/lib/audit";
 // GET /api/admin/banners — list all banners
 export async function GET() {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();
@@ -23,7 +23,7 @@ export async function GET() {
 // POST /api/admin/banners — create a banner
 export async function POST(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "manage");
     if (!session) return unauthorizedResponse();
 
     const parsed = parseBanner(await req.json().catch(() => null), true);

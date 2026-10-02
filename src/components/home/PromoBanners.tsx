@@ -1,4 +1,5 @@
 import React from "react";
+import { cloudinaryUrl } from "@/lib/utils";
 import Link from "next/link";
 
 export interface PublicBanner {
@@ -19,7 +20,8 @@ function BannerCard({ banner, tall }: { banner: PublicBanner; tall?: boolean }) 
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={banner.imageUrl}
+        src={cloudinaryUrl(banner.imageUrl, 1200)}
+        decoding="async"
         alt={banner.title}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         loading="lazy"

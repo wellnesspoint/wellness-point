@@ -6,6 +6,8 @@ export interface IUser extends Document {
   password?: string;
   image?: string;
   role: "user" | "admin";
+  /** staff permission level for admins; missing = owner (pre-roles admins) */
+  adminRole?: "owner" | "manager" | "support" | "content";
   provider: "credentials" | "google" | "facebook";
   providerId?: string;
   phone?: string;
@@ -63,6 +65,7 @@ const userSchema = new Schema<IUser>(
     password: { type: String, select: false },
     image: { type: String },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    adminRole: { type: String, enum: ["owner", "manager", "support", "content"] },
     provider: {
       type: String,
       enum: ["credentials", "google", "facebook"],

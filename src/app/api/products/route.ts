@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     if (featured === "true") filter.isFeatured = true;
 
     const products = await Product.find(filter)
-      .select("name slug price discountPrice images shortDescription rating reviewCount stock isFeatured")
+      .select("name slug price discountPrice images shortDescription rating reviewCount stock isFeatured variants")
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();

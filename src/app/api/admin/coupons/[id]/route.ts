@@ -12,7 +12,7 @@ interface Props {
 
 export async function PUT(req: NextRequest, { params }: Props) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("coupons", "manage");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;
@@ -66,7 +66,7 @@ export async function PUT(req: NextRequest, { params }: Props) {
 
 export async function DELETE(_req: NextRequest, { params }: Props) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("coupons", "manage");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;

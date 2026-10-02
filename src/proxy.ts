@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { matchRedirect, isProtectedPath, type RedirectRule } from "@/lib/redirects";
+
+// ─── Storefront status (maintenance mode + redirects) ───────────────
+// Read from /api/site-status and cached in memory for 30 s per instance, so pages
+// stay statically cached and the proxy adds at most one small request per 30 s.
+// Fails OPEN: if the status cannot be read, the site behaves normally.
+interface StoreStatus {
+  maintenance: { on: boolean };
+  redirects: RedirectRule[];
+}
+const STATUS_TTL_MS = 30_000;
+const EMPTY_STATUS: StoreStatus = { maintenance: { on: false }, redirects: [] };
+let statusCache: { value: StoreStatus; at: number } | null = null;
+
+async function loadStoreStatus(origin: string): Promise<StoreStatus> {
+  if (statusCache && Date.now() - statusCache.at < STATUS_TTL_MS) return statusCache.value;
+  try {
+    const res = await fetch(`${origin}/api/site-status`, { signal: AbortSignal.timeout(1500) });
+    if (res.ok) {
+      const value = (await res.json()) as StoreStatus;
+      statusCache = { value, at: Date.now() };
+      return value;
+    }
+  } catch {
+    // fall through to the stale/empty value
+  }
+  // Keep the last known value and retry in ~5 s.
+  statusCache = { value: statusCache?.value ?? EMPTY_STATUS, at: Date.now() - STATUS_TTL_MS + 5_000 };
+  return statusCache.value;
+}
+
+/** Only real page loads are redirected/blocked: never APIs (payment webhooks!), admin or assets. */
+function isStorefrontPage(req: NextRequest): boolean {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  return !isProtectedPath(req.nextUrl.pathname);
+}
 
 /**
  * Centralized proxy for route protection + login rate limiting.
@@ -12,6 +48,28 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
  */
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // ─── Storefront: redirects, then maintenance mode ─────────────────
+  if (pathname === "/api/site-status") return NextResponse.next();
+  if (isStorefrontPage(req)) {
+    const status = await loadStoreStatus(req.nextUrl.origin);
+
+    const rule = matchRedirect(pathname, status.redirects);
+    if (rule) {
+      const target = /^https:\/\//i.test(rule.to) ? new URL(rule.to) : new URL(rule.to, req.url);
+      return NextResponse.redirect(target, rule.permanent ? 301 : 302);
+    }
+
+    // A signed-in admin (cookie present; the admin pages verify it properly) can still
+    // browse the live storefront while it is in maintenance.
+    if (status.maintenance.on && !req.cookies.get("admin-token")?.value) {
+      return NextResponse.rewrite(new URL("/maintenance", req.url), {
+        status: 503,
+        headers: { "Retry-After": "3600", "Cache-Control": "no-store" },
+      });
+    }
+    return NextResponse.next();
+  }
 
   // ─── Rate limit login attempts ────────────────────────────────────
   if (pathname === "/api/auth/callback/credentials") {
@@ -83,13 +141,6 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    "/admin/:path*",
-    "/api/admin/:path*",
-    "/api/orders/:path*",
-    "/api/wishlist/:path*",
-    "/api/user/:path*",
-    "/api/auth/callback/credentials",
-  ],
+  // Everything except Next internals and files with an extension (images, fonts, robots.txt...).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

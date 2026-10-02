@@ -2,6 +2,8 @@
 
 import { useConfirm } from "@/components/admin/ConfirmProvider";
 import { useEffect, useState, useCallback } from "react";
+import Pagination, { useDebounced } from "@/components/admin/Pagination";
+import { downloadCsv } from "@/lib/csv";
 import {
   MessageSquare,
   Mail,
@@ -14,6 +16,7 @@ import {
   Archive,
   CheckCircle,
   Clock,
+  Download,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,8 +37,18 @@ interface Contact {
   status: "new" | "read" | "replied" | "archived";
   adminReply?: string;
   adminRepliedAt?: string;
+  priority?: "low" | "normal" | "high" | "urgent";
+  assignedTo?: { id: string; name?: string; email?: string };
+  internalNotes?: { text: string; by?: string; at: string }[];
   createdAt: string;
 }
+
+const PRIORITY_STYLE: Record<string, string> = {
+  low: "bg-gray-100 text-gray-600",
+  normal: "bg-blue-50 text-blue-700",
+  high: "bg-orange-100 text-orange-700",
+  urgent: "bg-red-100 text-red-700",
+};
 
 export default function ContactsPage() {
   const confirm = useConfirm();
@@ -45,23 +58,120 @@ export default function ContactsPage() {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
   const [filter, setFilter] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [assignees, setAssignees] = useState<{ _id: string; name: string; email: string }[]>([]);
+  const [noteText, setNoteText] = useState("");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ total: 0, pages: 1, limit: 20 });
+  const [statusCounts, setStatusCounts] = useState({ all: 0, new: 0, read: 0, replied: 0, archived: 0 });
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const buildQuery = useCallback(
+    (extra: Record<string, string> = {}) => {
+      const p = new URLSearchParams({ status: filter, ...extra });
+      if (debouncedSearch.trim()) p.set("q", debouncedSearch.trim());
+      if (assigneeFilter) p.set("assignee", assigneeFilter);
+      if (priorityFilter) p.set("priority", priorityFilter);
+      return p.toString();
+    },
+    [filter, debouncedSearch, assigneeFilter, priorityFilter]
+  );
 
   const fetchContacts = useCallback(async () => {
-    setLoading(true);
     try {
-      const res = await fetch("/api/admin/contacts");
+      const res = await fetch(`/api/admin/contacts?${buildQuery({ page: String(page) })}`);
       const json = await res.json();
+      if (!res.ok) throw new Error();
       setContacts(json.contacts || []);
+      setStatusCounts(json.counts);
+      setAssignees(json.assignees || []);
+      setMeta({ total: json.total, pages: json.pages, limit: json.limit });
+      setChecked(new Set());
     } catch (err) {
       console.error("Failed to load contacts:", err);
+      toast.error("Failed to load messages");
     }
     setLoading(false);
-  }, []);
+  }, [buildQuery, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, debouncedSearch, assigneeFilter, priorityFilter]);
 
   useEffect(() => {
     fetchContacts();
   }, [fetchContacts]);
+
+  // Priority / assignment / internal note on one message; keeps the open message and the list in sync.
+  const updateContact = async (id: string, patch: Record<string, unknown>, okMsg?: string) => {
+    try {
+      const res = await fetch(`/api/admin/contacts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Update failed");
+      setContacts((prev) => prev.map((c) => (c._id === id ? json.contact : c)));
+      setSelected((cur) => (cur && cur._id === id ? json.contact : cur));
+      if (okMsg) toast.success(okMsg);
+      return true;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Update failed");
+      return false;
+    }
+  };
+
+  const toggleChecked = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const bulk = async (action: "read" | "new" | "archived" | "delete") => {
+    if (checked.size === 0) return;
+    if (action === "delete" && !(await confirm(`Delete ${checked.size} message(s) permanently?`))) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/contacts/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...checked], action }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      toast.success(`${json.affected} message(s) updated`);
+      await fetchContacts();
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "Bulk action failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    try {
+      const res = await fetch(`/api/admin/contacts?${buildQuery({ all: "1" })}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error();
+      downloadCsv(
+        `contact-messages-${new Date().toISOString().slice(0, 10)}.csv`,
+        ["Date", "Name", "Email", "Phone", "Subject", "Message", "Status", "Reply"],
+        (json.contacts as Contact[]).map((c) => [
+          new Date(c.createdAt).toISOString().slice(0, 10),
+          c.name, c.email, c.phone, c.subject, c.message, c.status, c.adminReply ?? "",
+        ])
+      );
+    } catch {
+      toast.error("Export failed");
+    }
+  };
 
   const markAsRead = async (contact: Contact) => {
     if (contact.status === "new") {
@@ -76,6 +186,7 @@ export default function ContactsPage() {
             c._id === contact._id ? { ...c, status: "read" } : c
           )
         );
+        setStatusCounts((n) => ({ ...n, new: Math.max(0, n.new - 1), read: n.read + 1 }));
       } catch (err) {
         console.error("Mark read error:", err);
       }
@@ -106,6 +217,7 @@ export default function ContactsPage() {
         );
         toast.success("Reply sent!");
         setSelected(null);
+        fetchContacts();
       }
     } catch (err) {
       console.error("Reply error:", err);
@@ -126,6 +238,7 @@ export default function ContactsPage() {
         )
       );
       if (selected?._id === id) setSelected(null);
+      fetchContacts();
     } catch (err) {
       console.error("Archive error:", err);
     }
@@ -135,30 +248,14 @@ export default function ContactsPage() {
     if (!(await confirm("Delete this query permanently?"))) return;
     try {
       await fetch(`/api/admin/contacts/${id}`, { method: "DELETE" });
-      setContacts((prev) => prev.filter((c) => c._id !== id));
       if (selected?._id === id) setSelected(null);
+      fetchContacts();
     } catch (err) {
       console.error("Delete error:", err);
     }
   };
 
-  const filtered = contacts.filter((c) => {
-    const matchesSearch =
-      !search ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.subject.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === "all" || c.status === filter;
-    return matchesSearch && matchesFilter;
-  });
-
-  const statusCounts = {
-    all: contacts.length,
-    new: contacts.filter((c) => c.status === "new").length,
-    read: contacts.filter((c) => c.status === "read").length,
-    replied: contacts.filter((c) => c.status === "replied").length,
-    archived: contacts.filter((c) => c.status === "archived").length,
-  };
+  const filtered = contacts;
 
   const statusColors: Record<string, string> = {
     new: "bg-red-100 text-red-700",
@@ -296,6 +393,71 @@ export default function ContactsPage() {
               </div>
             )}
 
+            {/* Handling: priority, owner, internal notes (never shown to the customer) */}
+            <div className="space-y-3 rounded-lg border p-4">
+              <h3 className="text-sm font-medium text-foreground">Handling</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-muted-foreground">
+                  Priority
+                  <select
+                    value={selected.priority ?? "normal"}
+                    onChange={(e) => updateContact(selected._id, { priority: e.target.value }, "Priority updated")}
+                    className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground"
+                  >
+                    {["low", "normal", "high", "urgent"].map((p) => (
+                      <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  Assigned to
+                  <select
+                    value={selected.assignedTo?.id ?? ""}
+                    onChange={(e) => updateContact(selected._id, { assignedTo: e.target.value || null }, e.target.value ? "Assigned" : "Unassigned")}
+                    className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground"
+                  >
+                    <option value="">Nobody</option>
+                    {assignees.map((a) => (
+                      <option key={a._id} value={a._id}>{a.name || a.email}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div>
+                <p className="mb-1 text-xs text-muted-foreground">Internal notes (staff only)</p>
+                {(selected.internalNotes ?? []).length > 0 && (
+                  <ul className="mb-2 space-y-1">
+                    {selected.internalNotes!.map((n, i) => (
+                      <li key={i} className="rounded bg-yellow-50 px-3 py-1.5 text-sm text-foreground">
+                        {n.text}
+                        <span className="ml-2 text-[11px] text-muted-foreground">
+                          {n.by ?? "staff"} · {new Date(n.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    value={noteText}
+                    maxLength={1000}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Add a note for your team..."
+                    aria-label="Internal note"
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={!noteText.trim()}
+                    onClick={async () => {
+                      if (await updateContact(selected._id, { note: noteText.trim() }, "Note added")) setNoteText("");
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* Reply Form — only show if not already replied */}
             {selected.status !== "replied" && (
             <div className="border-t border-border pt-4">
@@ -360,12 +522,14 @@ export default function ContactsPage() {
             Customer messages from the Contact Us page
           </p>
         </div>
-        <Button
-          onClick={fetchContacts}
-          variant="outline"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={exportCsv} variant="outline">
+            <Download className="h-4 w-4 mr-2" /> CSV
+          </Button>
+          <Button onClick={fetchContacts} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -407,6 +571,44 @@ export default function ContactsPage() {
         />
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          className="h-10 rounded-lg border bg-background px-3 text-sm"
+          aria-label="Filter by assignee"
+        >
+          <option value="">Everyone&apos;s messages</option>
+          <option value="me">Assigned to me</option>
+          <option value="unassigned">Unassigned</option>
+          {assignees.map((a) => (
+            <option key={a._id} value={a._id}>{a.name || a.email}</option>
+          ))}
+        </select>
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+          className="h-10 rounded-lg border bg-background px-3 text-sm"
+          aria-label="Filter by priority"
+        >
+          <option value="">Any priority</option>
+          {["urgent", "high", "normal", "low"].map((p) => (
+            <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+          ))}
+        </select>
+      </div>
+
+      {checked.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-2 text-sm">
+          <span className="px-1 font-medium">{checked.size} selected</span>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("read")}>Mark read</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("new")}>Mark unread</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("archived")}>Archive</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("delete")}>Delete</Button>
+          <Button size="sm" variant="ghost" onClick={() => setChecked(new Set())}>Clear</Button>
+        </div>
+      )}
+
       {/* Query List */}
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
@@ -425,6 +627,14 @@ export default function ContactsPage() {
             >
               <CardContent className="py-4 px-4">
                 <div className="flex items-start justify-between gap-4">
+                  <input
+                    type="checkbox"
+                    checked={checked.has(contact._id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleChecked(contact._id)}
+                    className="mt-1 h-4 w-4 shrink-0"
+                    aria-label={`Select message from ${contact.name}`}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-1">
                       <h3
@@ -442,6 +652,16 @@ export default function ContactsPage() {
                         {statusIcons[contact.status]}
                         {contact.status}
                       </span>
+                      {contact.priority && contact.priority !== "normal" && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${PRIORITY_STYLE[contact.priority]}`}>
+                          {contact.priority}
+                        </span>
+                      )}
+                      {contact.assignedTo && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 bg-purple-50 text-purple-700">
+                          {contact.assignedTo.name || contact.assignedTo.email}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-medium">{contact.name}</span>
@@ -480,6 +700,14 @@ export default function ContactsPage() {
           ))}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        pages={meta.pages}
+        total={meta.total}
+        limit={meta.limit}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

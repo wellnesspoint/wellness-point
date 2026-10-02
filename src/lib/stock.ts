@@ -6,6 +6,8 @@ import { sendLowStockAlert } from "./email";
 
 export interface StockMovementInput {
   product: unknown;
+  variantId?: unknown;
+  variantName?: string;
   delta: number;
   reason: StockReason;
   order?: unknown;

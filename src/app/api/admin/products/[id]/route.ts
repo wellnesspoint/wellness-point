@@ -4,7 +4,9 @@ import Product from "@/models/Product";
 import Review from "@/models/Review";
 import Wishlist from "@/models/Wishlist";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
-import { truncateText } from "@/lib/utils";
+import { truncateText, normalizeTags } from "@/lib/utils";
+import mongoose from "mongoose";
+import { parseVariants, summarizeVariants } from "@/lib/variants";
 import { diffFields, logAudit } from "@/lib/audit";
 import { checkLowStock, logStockMovements } from "@/lib/stock";
 
@@ -27,6 +29,7 @@ const ALLOWED_FIELDS = [
   "weight",
   "gst",
   "category",
+  "tags",
   "isFeatured",
   "isActive",
   "metaTitle",
@@ -45,7 +48,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const session = await checkAdmin();
+    const session = await checkAdmin("products", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json();
@@ -89,6 +92,41 @@ export async function PUT(
     const update: Record<string, unknown> = {};
     for (const field of ALLOWED_FIELDS) {
       if (body[field] !== undefined) update[field] = body[field];
+    }
+
+    if (update.tags !== undefined) update.tags = normalizeTags(update.tags);
+
+    // Variants: validated, ids of existing variants kept (so carts/orders stay valid),
+    // and the product's own stock/price mirror them (see lib/variants.ts).
+    const variantMovements: { variantId: unknown; variantName: string; delta: number; balance: number }[] = [];
+    if (body.variants !== undefined) {
+      const parsed = parseVariants(body.variants);
+      if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      const oldById = new Map((existing.variants ?? []).map((v) => [String(v._id), v]));
+      if (parsed.variants.length === 0) {
+        update.variants = [];
+      } else {
+        const docs = parsed.variants.map((v) => {
+          const keep = v._id && oldById.has(v._id) ? v._id : undefined;
+          const doc = {
+            _id: keep ? new mongoose.Types.ObjectId(keep) : new mongoose.Types.ObjectId(),
+            name: v.name,
+            sku: v.sku,
+            price: v.price,
+            discountPrice: v.discountPrice,
+            stock: v.stock,
+            isActive: v.isActive,
+          };
+          const delta = v.stock - (keep ? oldById.get(keep)!.stock : 0);
+          if (delta !== 0) variantMovements.push({ variantId: doc._id, variantName: v.name, delta, balance: v.stock });
+          return doc;
+        });
+        const summary = summarizeVariants(docs);
+        update.variants = docs;
+        update.stock = summary.stock;
+        update.price = summary.price;
+        update.discountPrice = summary.discountPrice ?? null;
+      }
     }
 
     if (update.stock !== undefined) {
@@ -150,7 +188,19 @@ export async function PUT(
     const actorName = session.user.name || session.user.email;
     const changes = diffFields(before, product.toObject() as unknown as Record<string, unknown>, AUDITED_FIELDS);
 
-    if (changes.stock) {
+    if (variantMovements.length > 0) {
+      await logStockMovements(
+        variantMovements.map((m) => ({
+          product: product._id,
+          variantId: m.variantId,
+          variantName: m.variantName,
+          delta: m.delta,
+          reason: "admin_edit" as const,
+          actorName,
+          balance: m.balance,
+        }))
+      );
+    } else if (changes.stock) {
       await logStockMovements([
         {
           product: product._id,
@@ -197,7 +247,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await checkAdmin();
+    const session = await checkAdmin("products", "manage");
     if (!session) return unauthorizedResponse();
 
     await connectDB();

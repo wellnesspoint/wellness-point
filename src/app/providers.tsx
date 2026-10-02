@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "react-hot-toast";
 import { usePathname } from "next/navigation";
@@ -27,9 +27,21 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Registers the offline/caching service worker (public/sw.js). Production only, so dev reloads are never cached. */
+function ServiceWorkerRegister() {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // the site works the same without it
+    });
+  }, []);
+  return null;
+}
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
+      <ServiceWorkerRegister />
       <LayoutShell>{children}</LayoutShell>
       <Toaster
         position="bottom-right"

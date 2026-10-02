@@ -12,7 +12,7 @@ interface Props {
 // PUT /api/admin/banners/[id] — update banner
 export async function PUT(req: NextRequest, { params }: Props) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "manage");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;
@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest, { params }: Props) {
 // DELETE /api/admin/banners/[id] — delete banner
 export async function DELETE(req: NextRequest, { params }: Props) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "manage");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;

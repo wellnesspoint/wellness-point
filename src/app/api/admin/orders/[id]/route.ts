@@ -5,6 +5,9 @@ import Order from "@/models/Order";
 import Product from "@/models/Product";
 import razorpay from "@/lib/razorpay";
 import { logAudit } from "@/lib/audit";
+import { can } from "@/lib/permissions";
+import { incrementStock } from "@/lib/stock-ops";
+import { trackingUrlFor } from "@/lib/couriers";
 import { calcOrderTotal } from "@/lib/order-math";
 import { sendOrderStatusEmail, type OrderStatusEmailType } from "@/lib/email";
 import { checkLowStock, logStockMovements } from "@/lib/stock";
@@ -36,6 +39,11 @@ function parseTracking(input: any): { tracking: Tracking } | { error: string } {
   if (tracking.trackingUrl && !/^https:\/\//i.test(tracking.trackingUrl)) {
     return { error: "Tracking URL must start with https://" };
   }
+  // Known courier + number but no link given: build the courier's public tracking link.
+  if (!tracking.trackingUrl) {
+    const built = trackingUrlFor(tracking.courier, tracking.trackingNumber);
+    if (built) tracking.trackingUrl = built;
+  }
   return { tracking };
 }
 
@@ -43,7 +51,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await checkAdmin();
+  const session = await checkAdmin("orders", "manage");
   if (!session) return unauthorizedResponse();
 
   const { id } = await params;
@@ -133,6 +141,13 @@ export async function PUT(
       updateFields.orderStatus === "cancelled" && existing.orderStatus !== "cancelled";
     const enteringRefunded =
       updateFields.paymentStatus === "refunded" && existing.paymentStatus !== "refunded";
+    // Marking refunded sends real money back via Razorpay, so it needs the refunds permission.
+    if (enteringRefunded && !can(session.user.adminRole, "refunds", "manage")) {
+      return NextResponse.json(
+        { error: "Your role is not allowed to issue refunds" },
+        { status: 403 }
+      );
+    }
     const orderStatusChanged =
       !!updateFields.orderStatus && updateFields.orderStatus !== existing.orderStatus;
     const paymentStatusChanged =
@@ -183,13 +198,17 @@ export async function PUT(
       );
       if (claimed) {
         for (const item of existing.items) {
-          await Product.findByIdAndUpdate(item.product, {
-            $inc: { stock: item.quantity },
+          await incrementStock({
+            product: item.product,
+            variantId: item.variantId,
+            quantity: item.quantity,
           });
         }
         await logStockMovements(
           existing.items.map((item) => ({
             product: item.product,
+            variantId: item.variantId,
+            variantName: item.variantName,
             delta: item.quantity,
             reason: enteringRefunded ? ("refund" as const) : ("cancel" as const),
             order: existing._id,
@@ -286,7 +305,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await checkAdmin();
+  const session = await checkAdmin("orders", "view");
   if (!session) return unauthorizedResponse();
 
   const { id } = await params;

@@ -118,7 +118,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={social.label}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-muted-foreground transition-all duration-200 hover:bg-white/20 hover:scale-110 ${social.hoverColor}`}
+                  className={`flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-muted-foreground transition-all duration-200 hover:bg-white/20 hover:scale-110 ${social.hoverColor}`}
                 >
                   <social.icon className="h-5 w-5" />
                 </a>
@@ -131,12 +131,12 @@ export default function Footer() {
             <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white">
               Company
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-0">
               {FOOTER_LINKS.company.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400"
+                    className="inline-block py-2 text-sm text-muted-foreground transition-colors hover:text-wellness-400"
                   >
                     {link.label}
                   </Link>
@@ -150,12 +150,12 @@ export default function Footer() {
             <h3 className="mb-4 font-heading text-sm font-semibold uppercase tracking-wider text-white">
               My Account
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-0">
               {FOOTER_LINKS.account.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400 "
+                    className="inline-block py-2 text-sm text-muted-foreground transition-colors hover:text-wellness-400"
                   >
                     {link.label}
                   </Link>
@@ -165,12 +165,12 @@ export default function Footer() {
             <h3 className="mb-4 mt-6 font-heading text-sm font-semibold uppercase tracking-wider text-white">
               Legal
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-0">
               {FOOTER_LINKS.legal.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-wellness-400 "
+                    className="inline-block py-2 text-sm text-muted-foreground transition-colors hover:text-wellness-400"
                   >
                     {link.label}
                   </Link>

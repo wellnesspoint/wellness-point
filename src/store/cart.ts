@@ -1,8 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { lineKey } from "@/lib/variants";
 
 export interface CartItem {
   _id: string;
+  /** set for products that are sold as variants (size, flavour...) */
+  variantId?: string;
+  variantName?: string;
   name: string;
   slug: string;
   price: number;
@@ -16,8 +20,9 @@ interface CartStore {
   items: CartItem[];
   isOpen: boolean;
   addItem: (item: CartItem) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
+  /** `key` is lineKey(productId, variantId) — the product id alone for plain products */
+  removeItem: (key: string) => void;
+  updateQuantity: (key: string, quantity: number) => void;
   clearCart: () => void;
   toggleCart: () => void;
   openCart: () => void;
@@ -34,13 +39,14 @@ export const useCartStore = create<CartStore>()(
 
       addItem: (item) => {
         const items = get().items;
-        const existing = items.find((i) => i._id === item._id);
+        const key = lineKey(item._id, item.variantId);
+        const existing = items.find((i) => lineKey(i._id, i.variantId) === key);
 
         if (existing) {
           if (existing.quantity >= item.stock) return;
           set({
             items: items.map((i) =>
-              i._id === item._id
+              lineKey(i._id, i.variantId) === key
                 ? { ...i, quantity: i.quantity + 1 }
                 : i
             ),
@@ -50,18 +56,18 @@ export const useCartStore = create<CartStore>()(
         }
       },
 
-      removeItem: (id) => {
-        set({ items: get().items.filter((i) => i._id !== id) });
+      removeItem: (key) => {
+        set({ items: get().items.filter((i) => lineKey(i._id, i.variantId) !== key) });
       },
 
-      updateQuantity: (id, quantity) => {
+      updateQuantity: (key, quantity) => {
         if (quantity < 1) {
-          get().removeItem(id);
+          get().removeItem(key);
           return;
         }
         set({
           items: get().items.map((i) =>
-            i._id === id ? { ...i, quantity: Math.min(quantity, i.stock) } : i
+            lineKey(i._id, i.variantId) === key ? { ...i, quantity: Math.min(quantity, i.stock) } : i
           ),
         });
       },

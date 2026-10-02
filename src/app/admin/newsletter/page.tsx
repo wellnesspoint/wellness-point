@@ -13,14 +13,20 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Download,
 } from "lucide-react";
+import Pagination, { useDebounced } from "@/components/admin/Pagination";
+import { downloadCsv } from "@/lib/csv";
+import { AUDIENCES, AUDIENCE_LABELS, type Audience } from "@/lib/newsletter-audiences";
 import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
 
 interface Campaign {
   _id: string;
   subject: string;
-  status: "sending" | "done" | "failed";
+  status: "scheduled" | "sending" | "done" | "failed" | "cancelled";
+  scheduledAt?: string;
+  audience?: Audience;
   total: number;
   sent: number;
   failed: number;
@@ -40,6 +46,13 @@ export default function AdminNewsletterPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "unsubscribed">("all");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ total: 0, pages: 1, limit: 25 });
+  const [counts, setCounts] = useState({ all: 0, active: 0, unsubscribed: 0 });
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Compose state
   const [composeOpen, setComposeOpen] = useState(false);
@@ -47,8 +60,10 @@ export default function AdminNewsletterPage() {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [audience, setAudience] = useState<Audience>("all");
+  const [scheduleAt, setScheduleAt] = useState(""); // datetime-local value; empty = send now
 
-  const activeCount = subscribers.filter((s) => s.isActive !== false).length;
+  const activeCount = counts.active;
 
   // Send history. Sending runs in the background, so poll while any campaign is in progress.
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -75,17 +90,88 @@ export default function AdminNewsletterPage() {
     return () => clearInterval(t);
   }, [anySending, loadCampaigns]);
 
-  useEffect(() => {
-    fetch("/api/admin/newsletter")
-      .then((r) => r.json())
-      .then((d) => setSubscribers(d.subscribers || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const filtered = subscribers.filter((s) =>
-    s.email.toLowerCase().includes(search.toLowerCase())
+  const buildQuery = useCallback(
+    (extra: Record<string, string> = {}) => {
+      const p = new URLSearchParams({ status: statusFilter, ...extra });
+      if (debouncedSearch.trim()) p.set("q", debouncedSearch.trim());
+      return p.toString();
+    },
+    [statusFilter, debouncedSearch]
   );
+
+  const fetchSubscribers = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/newsletter?${buildQuery({ page: String(page) })}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error();
+      setSubscribers(d.subscribers || []);
+      setCounts(d.counts);
+      setMeta({ total: d.total, pages: d.pages, limit: d.limit });
+      setChecked(new Set());
+    } catch {
+      toast.error("Failed to load subscribers");
+    } finally {
+      setLoading(false);
+    }
+  }, [buildQuery, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, debouncedSearch]);
+
+  useEffect(() => {
+    fetchSubscribers();
+  }, [fetchSubscribers]);
+
+  const filtered = subscribers;
+
+  const toggleChecked = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const bulk = async (action: "delete" | "unsubscribe" | "resubscribe") => {
+    if (checked.size === 0) return;
+    if (action === "delete" && !(await confirm(`Delete ${checked.size} subscriber(s)?`))) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/newsletter/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...checked], action }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error);
+      toast.success(`${d.affected} subscriber(s) updated`);
+      await fetchSubscribers();
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "Bulk action failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    try {
+      const res = await fetch(`/api/admin/newsletter?${buildQuery({ all: "1" })}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error();
+      downloadCsv(
+        `subscribers-${new Date().toISOString().slice(0, 10)}.csv`,
+        ["Email", "Status", "Subscribed"],
+        (d.subscribers as Subscriber[]).map((x) => [
+          x.email,
+          x.isActive !== false ? "Active" : "Unsubscribed",
+          x.subscribedAt ? new Date(x.subscribedAt).toISOString().slice(0, 10) : "",
+        ])
+      );
+    } catch {
+      toast.error("Export failed");
+    }
+  };
 
   const handleDelete = async (id: string, email: string) => {
     if (!(await confirm(`Delete ${email} from newsletter?`))) return;
@@ -96,8 +182,8 @@ export default function AdminNewsletterPage() {
         body: JSON.stringify({ id }),
       });
       if (res.ok) {
-        setSubscribers((prev) => prev.filter((s) => s._id !== id));
         toast.success("Subscriber deleted");
+        fetchSubscribers();
       } else {
         toast.error("Failed to delete");
       }
@@ -112,10 +198,24 @@ export default function AdminNewsletterPage() {
       return;
     }
 
+    let scheduledAt: string | undefined;
+    if (scheduleAt) {
+      const when = new Date(scheduleAt);
+      if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
+        toast.error("Pick a time in the future");
+        return;
+      }
+      scheduledAt = when.toISOString();
+    }
+
     if (
       !(await confirm(
-        `Send this newsletter to ${activeCount} active subscriber${activeCount !== 1 ? "s" : ""}?`,
-        { danger: false, confirmLabel: "Send newsletter", title: "Send newsletter" }
+        scheduledAt
+          ? `Schedule this newsletter (${AUDIENCE_LABELS[audience]}) for ${new Date(scheduledAt).toLocaleString("en-IN")}? It is sent by the daily job, at its first run after that time.`
+          : audience === "all"
+            ? `Send this newsletter to ${activeCount} active subscriber${activeCount !== 1 ? "s" : ""}?`
+            : `Send this newsletter now to: ${AUDIENCE_LABELS[audience]}?`,
+        { danger: false, confirmLabel: scheduledAt ? "Schedule" : "Send newsletter", title: scheduledAt ? "Schedule newsletter" : "Send newsletter" }
       ))
     )
       return;
@@ -125,7 +225,7 @@ export default function AdminNewsletterPage() {
       const res = await fetch("/api/admin/newsletter/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: subject.trim(), body: body.trim() }),
+        body: JSON.stringify({ subject: subject.trim(), body: body.trim(), audience, scheduledAt }),
       });
 
       const data = await res.json();
@@ -134,6 +234,7 @@ export default function AdminNewsletterPage() {
         loadCampaigns();
         setSubject("");
         setBody("");
+        setScheduleAt("");
         setComposeOpen(false);
         setPreview(false);
       } else {
@@ -162,7 +263,7 @@ export default function AdminNewsletterPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-foreground">
-          Newsletter ({subscribers.length})
+          Newsletter ({counts.all})
         </h1>
         <div className="flex items-center gap-2">
           <button
@@ -187,10 +288,40 @@ export default function AdminNewsletterPage() {
             <h2 className="text-lg font-semibold text-foreground">
               Compose Newsletter
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Will be sent to {activeCount} active subscriber
-              {activeCount !== 1 ? "s" : ""} via Zoho SMTP.
-            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="nl-audience" className="mb-1 block text-sm font-medium text-foreground">Audience</label>
+                <select
+                  id="nl-audience"
+                  value={audience}
+                  onChange={(e) => setAudience(e.target.value as Audience)}
+                  disabled={sending}
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                >
+                  {AUDIENCES.map((a) => (
+                    <option key={a} value={a}>{AUDIENCE_LABELS[a]}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {activeCount} active subscriber{activeCount !== 1 ? "s" : ""} in total.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="nl-when" className="mb-1 block text-sm font-medium text-foreground">
+                  Send later <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <Input
+                  id="nl-when"
+                  type="datetime-local"
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                  disabled={sending}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Leave empty to send now. Scheduled newsletters go out in the daily job (9:00 AM IST), at its first run after the time you pick.
+                </p>
+              </div>
+            </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">
@@ -273,16 +404,49 @@ export default function AdminNewsletterPage() {
         </Card>
       )}
 
-      {/* Search */}
-      <div className="relative sm:w-64">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search emails..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search + filters */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search emails..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(["all", "active", "unsubscribed"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setStatusFilter(f)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                statusFilter === f
+                  ? "bg-wellness-600 text-white"
+                  : "bg-muted text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
+            </button>
+          ))}
+          <button
+            onClick={exportCsv}
+            className="flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent"
+          >
+            <Download className="h-4 w-4" /> CSV
+          </button>
+        </div>
       </div>
+
+      {checked.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-2 text-sm">
+          <span className="px-1 font-medium">{checked.size} selected</span>
+          <button disabled={bulkBusy} onClick={() => bulk("unsubscribe")} className="rounded-lg border px-3 py-1.5 hover:bg-accent">Unsubscribe</button>
+          <button disabled={bulkBusy} onClick={() => bulk("resubscribe")} className="rounded-lg border px-3 py-1.5 hover:bg-accent">Resubscribe</button>
+          <button disabled={bulkBusy} onClick={() => bulk("delete")} className="rounded-lg border px-3 py-1.5 text-red-600 hover:bg-red-50">Delete</button>
+          <button onClick={() => setChecked(new Set())} className="rounded-lg px-3 py-1.5 hover:bg-accent">Clear</button>
+        </div>
+      )}
 
       {/* Subscriber Table */}
       {filtered.length === 0 ? (
@@ -297,7 +461,21 @@ export default function AdminNewsletterPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
-                <th className="pb-3 font-medium">#</th>
+                <th className="w-8 pb-3">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every((x) => checked.has(x._id))}
+                    onChange={() =>
+                      setChecked(
+                        filtered.every((x) => checked.has(x._id))
+                          ? new Set()
+                          : new Set(filtered.map((x) => x._id))
+                      )
+                    }
+                    aria-label="Select all subscribers on this page"
+                    className="h-4 w-4"
+                  />
+                </th>
                 <th className="pb-3 font-medium">Email</th>
                 <th className="pb-3 font-medium">Status</th>
                 <th className="pb-3 font-medium">Subscribed</th>
@@ -305,9 +483,17 @@ export default function AdminNewsletterPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((sub, idx) => (
+              {filtered.map((sub) => (
                 <tr key={sub._id} className="hover:bg-accent">
-                  <td className="py-3 text-muted-foreground">{idx + 1}</td>
+                  <td className="py-3">
+                    <input
+                      type="checkbox"
+                      checked={checked.has(sub._id)}
+                      onChange={() => toggleChecked(sub._id)}
+                      aria-label={`Select ${sub.email}`}
+                      className="h-4 w-4"
+                    />
+                  </td>
                   <td className="py-3 font-medium text-foreground">
                     {sub.email}
                   </td>
@@ -348,6 +534,14 @@ export default function AdminNewsletterPage() {
         </div>
       )}
 
+      <Pagination
+        page={page}
+        pages={meta.pages}
+        total={meta.total}
+        limit={meta.limit}
+        onPageChange={setPage}
+      />
+
       {/* Send history */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-5">
@@ -369,12 +563,49 @@ export default function AdminNewsletterPage() {
                             ? "bg-green-100 text-green-700"
                             : c.status === "failed"
                               ? "bg-red-100 text-red-700"
-                              : "bg-blue-100 text-blue-700"
+                              : c.status === "scheduled"
+                                ? "bg-amber-100 text-amber-800"
+                                : c.status === "cancelled"
+                                  ? "bg-gray-100 text-gray-600"
+                                  : "bg-blue-100 text-blue-700"
                         }`}
                       >
-                        {c.status === "sending" ? `Sending… ${pct}%` : c.status === "done" ? "Sent" : "Failed"}
+                        {c.status === "sending"
+                          ? `Sending… ${pct}%`
+                          : c.status === "done"
+                            ? "Sent"
+                            : c.status === "scheduled"
+                              ? "Scheduled"
+                              : c.status === "cancelled"
+                                ? "Cancelled"
+                                : "Failed"}
                       </span>
                     </div>
+                    {c.status === "scheduled" && c.scheduledAt && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-amber-800">
+                          Goes out after {new Date(c.scheduledAt).toLocaleString("en-IN")}
+                          {c.audience && c.audience !== "all" ? ` · ${AUDIENCE_LABELS[c.audience]}` : ""}
+                        </span>
+                        <button
+                          className="rounded border px-2 py-0.5 hover:bg-accent"
+                          onClick={async () => {
+                            if (!(await confirm("Cancel this scheduled newsletter?"))) return;
+                            const res = await fetch("/api/admin/newsletter/campaigns", {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ id: c._id, action: "cancel" }),
+                            });
+                            const d = await res.json().catch(() => ({}));
+                            if (res.ok) toast.success("Cancelled");
+                            else toast.error(d.error || "Could not cancel");
+                            loadCampaigns();
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {new Date(c.createdAt).toLocaleString("en-IN", {
                         day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",

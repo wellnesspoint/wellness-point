@@ -30,24 +30,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import MobileCustomerCards from "./MobileCustomerCards";
+import type { UserItem } from "./types";
 import toast from "react-hot-toast";
 import { downloadCsv } from "@/lib/csv";
 import Pagination, { useDebounced } from "@/components/admin/Pagination";
 
-interface UserItem {
-  _id: string;
-  name: string;
-  email: string;
-  role: string;
-  provider: string;
-  phone?: string;
-  isActive: boolean;
-  createdAt: string;
-  addresses?: any[];
-  orderCount?: number;
-  totalSpent?: number;
-  lastOrderAt?: string;
-}
 
 const PAGE_SIZE = 25;
 
@@ -587,7 +575,19 @@ export default function AdminCustomersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        <MobileCustomerCards
+          users={filtered}
+          selectedIds={selectedIds}
+          allSelected={allSelected}
+          canSelectAny={selectableFilteredIds.length > 0}
+          onToggleAll={toggleSelectAll}
+          onToggle={toggleSelect}
+          onView={viewUser}
+          onToggleBlock={toggleBlock}
+          onDelete={handleDeleteUser}
+        />
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
@@ -716,6 +716,7 @@ export default function AdminCustomersPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <Pagination

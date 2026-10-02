@@ -2,6 +2,9 @@ import mongoose, { Document, Schema, Model } from "mongoose";
 
 export interface IOrderItem {
   product: mongoose.Types.ObjectId;
+  /** set when the line is a specific variant of the product */
+  variantId?: mongoose.Types.ObjectId;
+  variantName?: string;
   name: string;
   image: string;
   price: number;
@@ -33,6 +36,8 @@ export interface IOrder extends Document {
   stockRestored?: boolean;
   couponCode?: string;
   tracking?: { courier?: string; trackingNumber?: string; trackingUrl?: string };
+  /** shipment created through a courier API (Shiprocket); `creating` is the in-flight claim */
+  shipment?: { provider: string; creating?: boolean; orderId?: number; shipmentId?: number; awb?: string; createdAt?: Date };
   statusHistory?: {
     field: "orderStatus" | "paymentStatus";
     from?: string;
@@ -56,6 +61,8 @@ export interface IOrder extends Document {
 
 const orderItemSchema = new Schema<IOrderItem>({
   product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+  variantId: { type: Schema.Types.ObjectId },
+  variantName: { type: String },
   name: { type: String, required: true },
   image: { type: String, required: true },
   price: { type: Number, required: true },
@@ -106,6 +113,14 @@ const orderSchema = new Schema<IOrder>(
       courier: { type: String, trim: true, maxlength: 80 },
       trackingNumber: { type: String, trim: true, maxlength: 80 },
       trackingUrl: { type: String, trim: true, maxlength: 500 },
+    },
+    shipment: {
+      provider: { type: String },
+      creating: { type: Boolean },
+      orderId: { type: Number },
+      shipmentId: { type: Number },
+      awb: { type: String },
+      createdAt: { type: Date },
     },
     // Append-only trail of admin status changes (who/when).
     statusHistory: [

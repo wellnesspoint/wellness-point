@@ -44,6 +44,7 @@ interface ProductDetailClientProps {
     stock: number;
     rating: number;
     reviewCount: number;
+    variants?: { _id: string; name: string; price: number; discountPrice?: number; stock: number; isActive?: boolean }[];
   };
 }
 
@@ -52,6 +53,12 @@ export default function ProductDetailClient({
 }: ProductDetailClientProps) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  // Variants (size/flavour): only active ones are offered; the first in stock is preselected.
+  const variants = (product.variants ?? []).filter((v) => v.isActive !== false);
+  const [variantId, setVariantId] = useState<string | undefined>(
+    () => (variants.find((v) => v.stock > 0) ?? variants[0])?._id
+  );
+  const variant = variants.find((v) => v._id === variantId);
   // Tracks which image indices failed to load (e.g. a dead hotlinked URL) so
   // they can fall back to a placeholder instead of a broken-image icon.
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
@@ -82,41 +89,35 @@ export default function ProductDetailClient({
       .finally(() => setReviewsLoading(false));
   }, [product._id]);
 
+  // What is on sale right now: the chosen variant, or the product itself.
+  const sellable = variant ?? product;
+  const stock = sellable.stock;
   const hasDiscount =
-    product.discountPrice && product.discountPrice < product.price;
+    sellable.discountPrice && sellable.discountPrice < sellable.price;
   const discountPercent = hasDiscount
-    ? getDiscountPercentage(product.price, product.discountPrice!)
+    ? getDiscountPercentage(sellable.price, sellable.discountPrice!)
     : 0;
-  const effectivePrice = hasDiscount ? product.discountPrice! : product.price;
+  const effectivePrice = hasDiscount ? sellable.discountPrice! : sellable.price;
+  const cartLine = () => ({
+    _id: product._id,
+    ...(variant && { variantId: variant._id, variantName: variant.name }),
+    name: product.name,
+    slug: product.slug,
+    price: sellable.price,
+    discountPrice: sellable.discountPrice,
+    image: product.images[0],
+    quantity: 1,
+    stock,
+  });
 
   const handleAddToCart = () => {
-    for (let i = 0; i < quantity; i++) {
-      addItem({
-        _id: product._id,
-        name: product.name,
-        slug: product.slug,
-        price: product.price,
-        discountPrice: product.discountPrice,
-        image: product.images[0],
-        quantity: 1,
-        stock: product.stock,
-      });
-    }
-    toast.success(`${product.name} added to cart`);
+    for (let i = 0; i < quantity; i++) addItem(cartLine());
+    toast.success(`${product.name}${variant ? ` (${variant.name})` : ""} added to cart`);
     openCart();
   };
 
   const handleBuyNow = () => {
-    addItem({
-      _id: product._id,
-      name: product.name,
-      slug: product.slug,
-      price: product.price,
-      discountPrice: product.discountPrice,
-      image: product.images[0],
-      quantity: 1,
-      stock: product.stock,
-    });
+    addItem(cartLine());
     router.push("/checkout");
   };
 
@@ -156,7 +157,7 @@ export default function ProductDetailClient({
   };
 
   return (
-    <div className="py-8">
+    <div className="py-8 pb-28 md:pb-8">
       <div className="container mx-auto px-4">
         <div className="grid gap-10 lg:grid-cols-2">
           {/* Image Gallery */}
@@ -245,22 +246,55 @@ export default function ProductDetailClient({
               {hasDiscount && (
                 <>
                   <span className="text-xl text-muted-foreground line-through">
-                    {formatPrice(product.price)}
+                    {formatPrice(sellable.price)}
                   </span>
                   <Badge variant="success">Save {discountPercent}%</Badge>
                 </>
               )}
             </div>
 
+            {variants.length > 0 && (
+              <div role="radiogroup" aria-label="Choose an option" className="space-y-2">
+                <p className="text-sm font-medium text-foreground">
+                  Option{variant ? `: ${variant.name}` : ""}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((v) => {
+                    const selected = v._id === variantId;
+                    const out = v.stock <= 0;
+                    return (
+                      <button
+                        key={v._id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => {
+                          setVariantId(v._id);
+                          setQuantity(1);
+                        }}
+                        className={`min-h-[44px] rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                          selected
+                            ? "border-wellness-600 bg-wellness-50 text-wellness-800 ring-1 ring-wellness-600"
+                            : "border-border bg-card text-foreground hover:bg-accent"
+                        } ${out ? "opacity-50 line-through" : ""}`}
+                      >
+                        {v.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <Separator />
 
             {/* Stock */}
             <div className="flex items-center gap-2">
-              {product.stock > 0 ? (
+              {stock > 0 ? (
                 <>
                   <Check className="h-4 w-4 text-wellness-600" />
                   <span className="text-sm font-medium text-wellness-700">
-                    In Stock ({product.stock} available)
+                    In Stock ({stock} available)
                   </span>
                 </>
               ) : (
@@ -285,7 +319,7 @@ export default function ProductDetailClient({
                 </span>
                 <button
                   onClick={() =>
-                    setQuantity(Math.min(product.stock, quantity + 1))
+                    setQuantity(Math.min(stock, quantity + 1))
                   }
                   className="px-4 py-3 text-muted-foreground hover:text-foreground"
                   aria-label="Increase quantity"
@@ -299,7 +333,7 @@ export default function ProductDetailClient({
                 size="lg"
                 className="flex-1"
                 onClick={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={stock === 0}
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
                 Add to Cart — {formatPrice(effectivePrice * quantity)}
@@ -309,7 +343,7 @@ export default function ProductDetailClient({
                 size="lg"
                 className="flex-1 bg-wellness-800 text-white hover:bg-wellness-900"
                 onClick={handleBuyNow}
-                disabled={product.stock === 0}
+                disabled={stock === 0}
               >
                 <Zap className="mr-2 h-5 w-5" />
                 Buy Now
@@ -556,6 +590,26 @@ export default function ProductDetailClient({
               </div>
             </TabsContent>
           </Tabs>
+        </div>
+      </div>
+
+      {/* Phones: keep the buy button within thumb reach while scrolling */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] backdrop-blur md:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-md items-center gap-3">
+          <div className="min-w-0">
+            <p className="text-lg font-bold leading-none text-wellness-700">{formatPrice(effectivePrice * quantity)}</p>
+            {variant && <p className="mt-1 truncate text-xs text-muted-foreground">{variant.name}</p>}
+          </div>
+          <Button
+            variant="wellness"
+            size="lg"
+            className="h-12 flex-1"
+            onClick={handleAddToCart}
+            disabled={stock === 0}
+          >
+            <ShoppingCart className="mr-2 h-5 w-5" />
+            {stock === 0 ? "Out of stock" : "Add to Cart"}
+          </Button>
         </div>
       </div>
     </div>

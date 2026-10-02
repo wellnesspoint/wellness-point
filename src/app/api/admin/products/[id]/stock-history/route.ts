@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("products", "view");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;

@@ -26,6 +26,7 @@ interface ProductCardProps {
     rating: number;
     reviewCount: number;
     stock: number;
+    variants?: { isActive?: boolean }[];
   };
   isWishlisted?: boolean;
   onWishlistChange?: () => void;
@@ -40,6 +41,8 @@ function ProductCard({ product, isWishlisted = false, onWishlistChange }: Produc
   const [wishLoading, setWishLoading] = useState(false);
   const [imgError, setImgError] = useState(false);
 
+  // Products sold as variants (size/flavour) need an option chosen on the product page.
+  const hasVariants = (product.variants?.filter((v) => v.isActive !== false).length ?? 0) > 0;
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
   const discountPercent = hasDiscount
     ? getDiscountPercentage(product.price, product.discountPrice!)
@@ -161,6 +164,7 @@ function ProductCard({ product, isWishlisted = false, onWishlistChange }: Produc
         {/* Price row */}
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <span className="text-xl font-bold text-foreground">
+            {hasVariants && <span className="mr-1 text-xs font-normal text-muted-foreground">From</span>}
             {formatPrice(hasDiscount ? product.discountPrice! : product.price)}
           </span>
           {hasDiscount && (
@@ -177,26 +181,34 @@ function ProductCard({ product, isWishlisted = false, onWishlistChange }: Produc
 
         {/* Spacer */}
         <div className="mt-auto space-y-2">
-          {/* Add to Cart – outline button */}
-          <Button
-            variant="outline"
-            className="w-full border-wellness-600 text-wellness-700 hover:bg-wellness-50"
-            onClick={handleAddToCart}
-            disabled={product.stock === 0}
-          >
-            <ShoppingCart className="mr-2 h-4 w-4" />
-            Add to Cart
-          </Button>
+          {hasVariants ? (
+            <Button asChild variant="wellness" className="w-full" disabled={product.stock === 0}>
+              <Link href={`/product/${product.slug}`}>Select options</Link>
+            </Button>
+          ) : (
+            <>
+              {/* Add to Cart – outline button */}
+              <Button
+                variant="outline"
+                className="w-full border-wellness-600 text-wellness-700 hover:bg-wellness-50"
+                onClick={handleAddToCart}
+                disabled={product.stock === 0}
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Add to Cart
+              </Button>
 
-          {/* Buy Now – solid button */}
-          <Button
-            variant="wellness"
-            className="w-full"
-            onClick={handleBuyNow}
-            disabled={product.stock === 0}
-          >
-            Buy Now
-          </Button>
+              {/* Buy Now – solid button */}
+              <Button
+                variant="wellness"
+                className="w-full"
+                onClick={handleBuyNow}
+                disabled={product.stock === 0}
+              >
+                Buy Now
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </Card>

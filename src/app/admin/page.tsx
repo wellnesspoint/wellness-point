@@ -23,6 +23,11 @@ interface Stats {
   totalRevenue: number;
   todaySales: number;
   todayOrderCount: number;
+  yesterdaySales: number;
+  yesterdayOrderCount: number;
+  topCustomers: { name: string; email: string; orders: number; spent: number }[];
+  refundedAmount: number;
+  refundRate: number;
   totalOrders: number;
   pendingOrders: number;
   totalCustomers: number;
@@ -40,6 +45,11 @@ const defaultStats: Stats = {
   totalRevenue: 0,
   todaySales: 0,
   todayOrderCount: 0,
+  yesterdaySales: 0,
+  yesterdayOrderCount: 0,
+  topCustomers: [],
+  refundedAmount: 0,
+  refundRate: 0,
   totalOrders: 0,
   pendingOrders: 0,
   totalCustomers: 0,
@@ -156,7 +166,15 @@ export default function AdminDashboard() {
     {
       title: "Today's Sales",
       value: `₹${stats.todaySales.toLocaleString("en-IN")}`,
-      subtitle: `${stats.todayOrderCount} order${stats.todayOrderCount !== 1 ? "s" : ""} today`,
+      subtitle: `${stats.todayOrderCount} order${stats.todayOrderCount !== 1 ? "s" : ""} today · ${
+        stats.yesterdaySales > 0
+          ? `${stats.todaySales >= stats.yesterdaySales ? "▲" : "▼"} ${Math.abs(
+              Math.round(((stats.todaySales - stats.yesterdaySales) / stats.yesterdaySales) * 100)
+            )}% vs yesterday`
+          : stats.todaySales > 0
+            ? "▲ vs ₹0 yesterday"
+            : "no sales yesterday"
+      }`,
       icon: TrendingUp,
       color: "text-blue-600 bg-blue-50",
       href: "/admin/payments",
@@ -547,6 +565,43 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
+          {/* Top Customers */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Users className="h-4 w-4 text-emerald-500" />
+                Top Customers
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-8 w-full rounded" />
+                  ))}
+                </div>
+              ) : stats.topCustomers.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">No paid orders yet</p>
+              ) : (
+                <ul className="space-y-2">
+                  {stats.topCustomers.map((c, i) => (
+                    <li key={c.email || i} className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{c.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {c.orders} order{c.orders !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-emerald-700">
+                        ₹{Math.round(c.spent).toLocaleString("en-IN")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Quick Stats */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
@@ -560,6 +615,14 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Refunded Orders</span>
                 <span className="text-sm font-semibold">{loading ? "—" : stats.refundedOrders}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Refund rate (by value)</span>
+                <span className="text-sm font-semibold">
+                  {loading
+                    ? "—"
+                    : `${(stats.refundRate * 100).toFixed(1)}% · ₹${Math.round(stats.refundedAmount).toLocaleString("en-IN")}`}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Payment Success Rate</span>

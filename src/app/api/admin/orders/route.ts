@@ -33,7 +33,7 @@ const SUBTOTAL_EXPR = {
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("orders", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();

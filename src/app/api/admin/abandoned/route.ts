@@ -13,7 +13,7 @@ import { rateLimit } from "@/lib/rate-limit";
 /** GET /api/admin/abandoned?page= — recoverable abandoned checkouts (1 hour – 7 days old). */
 export async function GET(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("orders", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("orders", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json().catch(() => ({}));

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateShippingAddress, isLikelyImageFile, escapeHtml } from "@/lib/utils";
+import { validateShippingAddress, isLikelyImageFile, escapeHtml, cloudinaryUrl } from "@/lib/utils";
 
 const good = {
   fullName: "Mary-Jane O'Brien",
@@ -46,5 +46,20 @@ describe("isLikelyImageFile", () => {
 describe("escapeHtml", () => {
   it("escapes markup characters", () => {
     expect(escapeHtml(`<a href="x">'&</a>`)).toBe("&lt;a href=&quot;x&quot;&gt;&#39;&amp;&lt;/a&gt;");
+  });
+});
+
+describe("cloudinaryUrl", () => {
+  it("adds a width/auto-format transformation to plain Cloudinary delivery URLs", () => {
+    expect(cloudinaryUrl("https://res.cloudinary.com/demo/image/upload/v123/wellness-point/p/a.jpg", 160)).toBe(
+      "https://res.cloudinary.com/demo/image/upload/f_auto,q_auto,c_limit,w_160/v123/wellness-point/p/a.jpg"
+    );
+  });
+
+  it("leaves other URLs, already-transformed URLs and empty values alone", () => {
+    expect(cloudinaryUrl("https://images.unsplash.com/photo-1?w=800", 160)).toBe("https://images.unsplash.com/photo-1?w=800");
+    const transformed = "https://res.cloudinary.com/demo/image/upload/w_300/v1/a.jpg";
+    expect(cloudinaryUrl(transformed, 160)).toBe(transformed);
+    expect(cloudinaryUrl(undefined, 160)).toBe("");
   });
 });

@@ -1,6 +1,6 @@
 import razorpay from "@/lib/razorpay";
 import Order from "@/models/Order";
-import Product from "@/models/Product";
+import { decrementStock, incrementStock } from "@/lib/stock-ops";
 import { sendOrderConfirmation } from "@/lib/email";
 import { checkLowStock, logStockMovements } from "@/lib/stock";
 
@@ -82,25 +82,30 @@ export async function finalizeOrder(input: FinalizeInput): Promise<FinalizeResul
     }
 
     // Decrement stock atomically per item, rolling back on any shortfall.
-    const decremented: { product: any; quantity: number }[] = [];
+    const decremented: { product: any; variantId?: any; variantName?: string; quantity: number }[] = [];
     let stockError: string | null = null;
 
     for (const item of order.items) {
-      const result = await Product.findOneAndUpdate(
-        { _id: item.product, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { new: true }
-      );
-      if (!result) {
+      const ok = await decrementStock({
+        product: item.product,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      });
+      if (!ok) {
         stockError = `"${item.name}" is no longer available in the requested quantity.`;
         break;
       }
-      decremented.push({ product: item.product, quantity: item.quantity });
+      decremented.push({
+        product: item.product,
+        variantId: item.variantId,
+        variantName: item.variantName,
+        quantity: item.quantity,
+      });
     }
 
     if (stockError) {
       for (const d of decremented) {
-        await Product.findByIdAndUpdate(d.product, { $inc: { stock: d.quantity } });
+        await incrementStock(d);
       }
 
       order.razorpayPaymentId = input.razorpayPaymentId;
@@ -150,6 +155,8 @@ export async function finalizeOrder(input: FinalizeInput): Promise<FinalizeResul
     await logStockMovements(
       decremented.map((d) => ({
         product: d.product,
+        variantId: d.variantId,
+        variantName: d.variantName,
         delta: -d.quantity,
         reason: "order" as const,
         order: order._id,

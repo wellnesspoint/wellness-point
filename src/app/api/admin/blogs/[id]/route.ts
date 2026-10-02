@@ -16,7 +16,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json();
@@ -70,7 +70,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "manage");
     if (!session) return unauthorizedResponse();
 
     await connectDB();

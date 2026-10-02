@@ -7,7 +7,7 @@ import { logAudit } from "@/lib/audit";
 // GET /api/admin/shipping — get shipping settings
 export async function GET() {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("shipping", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();
@@ -86,7 +86,7 @@ function parseSettings(body: any): { data: Record<string, unknown> } | { error: 
 // PUT /api/admin/shipping — update shipping settings
 export async function PUT(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("shipping", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json().catch(() => null);

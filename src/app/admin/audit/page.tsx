@@ -4,7 +4,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { History, Search } from "lucide-react";
+import { History, Search, Download } from "lucide-react";
+import Link from "next/link";
+import { downloadCsv } from "@/lib/csv";
+import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import Pagination, { useDebounced } from "@/components/admin/Pagination";
 
@@ -29,7 +32,29 @@ const ENTITIES = [
   { value: "banner", label: "Banners" },
   { value: "newsletter", label: "Newsletter" },
   { value: "admin", label: "Admin sign-ins & 2FA" },
+  { value: "review", label: "Reviews" },
+  { value: "contact", label: "Contact messages" },
+  { value: "subscriber", label: "Subscribers" },
+  { value: "category", label: "Categories" },
+  { value: "redirect", label: "Redirects" },
 ];
+
+// Where to look at the thing a log entry is about.
+const ENTITY_LINKS: Record<string, string> = {
+  order: "/admin/orders",
+  product: "/admin/products",
+  user: "/admin/customers",
+  coupon: "/admin/coupons",
+  shipping: "/admin/shipping",
+  settings: "/admin/settings",
+  banner: "/admin/marketing",
+  newsletter: "/admin/newsletter",
+  review: "/admin/reviews",
+  contact: "/admin/contacts",
+  subscriber: "/admin/newsletter",
+  category: "/admin/categories",
+  redirect: "/admin/site",
+};
 
 const actionColor = (action: string) => {
   if (/(refund|delete|archive|disable|bulk)/.test(action)) return "bg-red-100 text-red-700";
@@ -49,6 +74,8 @@ export default function AuditLogPage() {
   const debouncedSearch = useDebounced(search);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [actor, setActor] = useState("");
+  const [actors, setActors] = useState<string[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const requestId = useRef(0);
@@ -61,11 +88,13 @@ export default function AuditLogPage() {
       if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
       if (from) params.set("from", from);
       if (to) params.set("to", to);
+      if (actor) params.set("actor", actor);
       const res = await fetch(`/api/admin/audit?${params}`);
       const d = await res.json();
       if (id !== requestId.current) return;
       if (!res.ok) throw new Error(d.error || "Failed to load audit log");
       setLogs(d.logs || []);
+      setActors(d.actors || []);
       setTotal(d.total || 0);
       setPages(d.pages || 1);
     } catch (err) {
@@ -76,11 +105,39 @@ export default function AuditLogPage() {
         setInitialLoading(false);
       }
     }
-  }, [page, entity, debouncedSearch, from, to]);
+  }, [page, entity, debouncedSearch, from, to, actor]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
+
+  const exportCsv = async () => {
+    try {
+      const params = new URLSearchParams({ all: "1", entity });
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      if (actor) params.set("actor", actor);
+      const res = await fetch(`/api/admin/audit?${params}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error();
+      downloadCsv(
+        `audit-log-${new Date().toISOString().slice(0, 10)}.csv`,
+        ["When", "Admin", "Email", "Action", "Area", "Reference", "Details"],
+        (d.logs as AuditLogItem[]).map((l) => [
+          new Date(l.createdAt).toISOString(),
+          l.actor?.name ?? "system",
+          l.actor?.email ?? "",
+          l.action,
+          l.entity,
+          l.entityId ?? "",
+          l.summary,
+        ])
+      );
+    } catch {
+      toast.error("Export failed");
+    }
+  };
 
   const reset = (fn: () => void) => {
     fn();
@@ -127,11 +184,26 @@ export default function AuditLogPage() {
             <option key={e.value} value={e.value}>{e.label}</option>
           ))}
         </select>
+        <select
+          value={actor}
+          onChange={(e) => reset(() => setActor(e.target.value))}
+          className="rounded-lg border bg-background px-3 text-sm"
+          aria-label="Filter by admin"
+        >
+          <option value="">Every admin</option>
+          <option value="system">System (automatic)</option>
+          {actors.map((a) => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
         <div className="flex items-center gap-2">
           <Input type="date" value={from} onChange={(e) => reset(() => setFrom(e.target.value))} className="w-36" />
           <span className="text-xs text-muted-foreground">to</span>
           <Input type="date" value={to} onChange={(e) => reset(() => setTo(e.target.value))} className="w-36" />
         </div>
+        <Button variant="outline" size="sm" className="h-10" onClick={exportCsv}>
+          <Download className="mr-1 h-4 w-4" /> CSV
+        </Button>
       </div>
 
       {logs.length === 0 ? (
@@ -154,6 +226,12 @@ export default function AuditLogPage() {
                     <span className="text-xs text-muted-foreground">
                       by {log.actor?.name || log.actor?.email || "system"}
                     </span>
+                    {ENTITY_LINKS[log.entity] && (
+                      <Link href={ENTITY_LINKS[log.entity]} className="text-xs text-emerald-700 hover:underline">
+                        {log.entity}
+                        {log.entityId ? ` ${log.entityId.slice(-6).toUpperCase()}` : ""} →
+                      </Link>
+                    )}
                   </div>
                   <p className="mt-1 break-words text-sm text-foreground">{log.summary}</p>
                 </div>

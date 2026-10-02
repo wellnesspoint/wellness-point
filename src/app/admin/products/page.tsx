@@ -11,39 +11,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus,
-  Pencil,
-  Trash2,
   X,
   Package,
   Search,
   Upload,
-  Archive,
-  ArchiveRestore,
-  History,
+  Download,
+  Boxes,
 } from "lucide-react";
+import Link from "next/link";
+import { downloadCsv } from "@/lib/csv";
+import VariantsEditor, { type VariantForm } from "./VariantsEditor";
+import ProductRow from "./ProductRow";
+import type { Product } from "./types";
 import toast from "react-hot-toast";
 
-interface Product {
-  _id: string;
-  name: string;
-  slug: string;
-  description: string;
-  price: number;
-  discountPrice?: number;
-  images: string[];
-  ingredients: string[];
-  benefits: string[];
-  usage: string;
-  stock: number;
-  lowStockThreshold?: number;
-  archivedAt?: string;
-  sku?: string;
-  weight?: number;
-  gst?: number;
-  isFeatured: boolean;
-  isActive: boolean;
-  category?: string;
-}
+
 
 const emptyProduct = {
   name: "",
@@ -62,6 +44,8 @@ const emptyProduct = {
   isFeatured: false,
   isActive: true,
   category: "",
+  tags: "",
+  variants: [] as VariantForm[],
 };
 
 const PAGE_SIZE = 24;
@@ -95,6 +79,86 @@ export default function AdminProductsPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [categoryNames, setCategoryNames] = useState<string[]>([]);
+  useEffect(() => {
+    fetch("/api/admin/categories")
+      .then((r) => r.json())
+      .then((d) => setCategoryNames((d.categories || []).map((c: { name: string }) => c.name)))
+      .catch(() => {});
+  }, []);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const toggleChecked = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const bulk = async (
+    action: string,
+    extra: Record<string, unknown> = {},
+    confirmMsg?: string
+  ) => {
+    if (checked.size === 0) return;
+    if (confirmMsg && !(await confirm(confirmMsg))) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...checked], action, ...extra }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Bulk action failed");
+      toast.success(`${data.affected} product(s) updated`);
+      setChecked(new Set());
+      fetchProducts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bulk action failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkPrice = async () => {
+    const v = window.prompt("Change price by what percent? (e.g. 10 for +10%, -5 for -5%)");
+    if (v === null || v.trim() === "") return;
+    await bulk("adjust_price", { percent: Number(v) }, `Change prices of ${checked.size} product(s) by ${v}%?`);
+  };
+
+  const bulkCategory = async () => {
+    const v = window.prompt("Set category for selected products (leave empty to clear):");
+    if (v === null) return;
+    await bulk("set_category", { category: v });
+  };
+
+  const exportCsv = async () => {
+    try {
+      const params = new URLSearchParams({
+        all: "1",
+        ...(PRODUCT_FILTERS.find((f) => f.value === filter)?.params ?? {}),
+      });
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      const res = await fetch(`/api/admin/products?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error();
+      downloadCsv(
+        `products-${new Date().toISOString().slice(0, 10)}.csv`,
+        ["name", "sku", "category", "price", "discountPrice", "stock", "weight", "gst", "status", "description", "image"],
+        (data.products as Product[]).map((x) => [
+          x.name, x.sku ?? "", x.category ?? "", x.price, x.discountPrice ?? "", x.stock,
+          x.weight ?? "", x.gst ?? "",
+          x.archivedAt ? "archived" : x.isActive === false ? "inactive" : "active",
+          x.description, x.images?.[0] ?? "",
+        ])
+      );
+    } catch {
+      toast.error("Export failed");
+    }
+  };
 
   const fetchProducts = useCallback(async () => {
     const id = ++requestId.current;
@@ -111,6 +175,7 @@ export default function AdminProductsPage() {
       if (id !== requestId.current) return; // a newer request superseded this one
       if (!res.ok) throw new Error(data.error || "Failed to load products");
       setProducts(data.products || []);
+      setChecked(new Set());
       setTotal(data.total || 0);
       setPages(data.pages || 1);
     } catch (err) {
@@ -156,6 +221,16 @@ export default function AdminProductsPage() {
       isFeatured: product.isFeatured,
       isActive: product.isActive !== false,
       category: product.category || "",
+      tags: (product.tags || []).join(", "),
+      variants: (product.variants || []).map((v) => ({
+        _id: v._id,
+        name: v.name,
+        sku: v.sku || "",
+        price: String(v.price),
+        discountPrice: v.discountPrice ? String(v.discountPrice) : "",
+        stock: String(v.stock),
+        isActive: v.isActive !== false,
+      })),
     });
     setEditId(product._id);
     setImageFiles([]);
@@ -210,7 +285,7 @@ export default function AdminProductsPage() {
   // Stock history (inline panel under a product)
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [history, setHistory] = useState<
-    { _id: string; delta: number; reason: string; actorName?: string; balance?: number; createdAt: string }[]
+    { _id: string; delta: number; reason: string; variantName?: string; actorName?: string; balance?: number; createdAt: string }[]
   >([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
@@ -300,10 +375,22 @@ export default function AdminProductsPage() {
 
       const allImages = [...existingImages, ...uploadedUrls];
 
+      const hasVariants = form.variants.length > 0;
       const payload = {
         name: form.name,
         description: form.description,
-        price: Number(form.price),
+        // With variants the server derives price/stock from them; the first variant
+        // only satisfies the "price is required" check on create.
+        price: hasVariants ? Number(form.variants[0].price) : Number(form.price),
+        variants: form.variants.map((v) => ({
+          _id: v._id,
+          name: v.name,
+          sku: v.sku || undefined,
+          price: Number(v.price),
+          discountPrice: v.discountPrice ? Number(v.discountPrice) : undefined,
+          stock: Number(v.stock) || 0,
+          isActive: v.isActive,
+        })),
         discountPrice: form.discountPrice ? Number(form.discountPrice) : undefined,
         images: allImages,
         ingredients: form.ingredients
@@ -323,6 +410,7 @@ export default function AdminProductsPage() {
         isFeatured: form.isFeatured,
         isActive: form.isActive,
         category: form.category,
+        tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
       };
 
       const url = editId
@@ -373,8 +461,8 @@ export default function AdminProductsPage() {
         <h1 className="text-2xl font-bold text-foreground">
           Products ({total})
         </h1>
-        <div className="flex gap-2">
-          <div className="relative flex-1 sm:w-64">
+        <div className="flex flex-wrap gap-2">
+          <div className="relative min-w-[12rem] flex-1 sm:w-64 sm:flex-none">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search products..."
@@ -399,6 +487,14 @@ export default function AdminProductsPage() {
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}
           </select>
+          <Button variant="outline" onClick={exportCsv} title="Export CSV" aria-label="Export CSV">
+            <Download className="h-4 w-4" />
+          </Button>
+          <Link href="/admin/inventory">
+            <Button variant="outline" title="Inventory, stock and CSV import" aria-label="Inventory">
+              <Boxes className="h-4 w-4" />
+            </Button>
+          </Link>
           {!showForm && (
             <Button variant="wellness" onClick={handleAdd}>
               <Plus className="mr-1 h-4 w-4" /> Add
@@ -406,6 +502,33 @@ export default function AdminProductsPage() {
           )}
         </div>
       </div>
+
+      {checked.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-2 text-sm">
+          <span className="px-1 font-medium">{checked.size} selected</span>
+          {filter === "archived" ? (
+            <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("restore")}>Restore</Button>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("activate")}>Activate</Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("deactivate")}>Deactivate</Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("feature")}>Feature</Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("unfeature")}>Unfeature</Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={bulkCategory}>Set category</Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={bulkPrice}>Change price %</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkBusy}
+                onClick={() => bulk("archive", {}, `Archive ${checked.size} product(s)? They will be hidden from the store.`)}
+              >
+                Archive
+              </Button>
+            </>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => setChecked(new Set())}>Clear</Button>
+        </div>
+      )}
 
       {/* Form */}
       {showForm && (
@@ -447,7 +570,9 @@ export default function AdminProductsPage() {
                 <Label>Price (₹) *</Label>
                 <Input
                   type="number"
-                  value={form.price}
+                  value={form.variants.length ? "" : form.price}
+                  disabled={form.variants.length > 0}
+                  placeholder={form.variants.length ? "Set per variant" : undefined}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
                 />
               </div>
@@ -455,7 +580,9 @@ export default function AdminProductsPage() {
                 <Label>Discount Price (₹)</Label>
                 <Input
                   type="number"
-                  value={form.discountPrice}
+                  value={form.variants.length ? "" : form.discountPrice}
+                  disabled={form.variants.length > 0}
+                  placeholder={form.variants.length ? "Set per variant" : undefined}
                   onChange={(e) =>
                     setForm({ ...form, discountPrice: e.target.value })
                   }
@@ -465,7 +592,9 @@ export default function AdminProductsPage() {
                 <Label>Stock</Label>
                 <Input
                   type="number"
-                  value={form.stock}
+                  value={form.variants.length ? "" : form.stock}
+                  disabled={form.variants.length > 0}
+                  placeholder={form.variants.length ? "Total of variants" : undefined}
                   onChange={(e) => setForm({ ...form, stock: e.target.value })}
                 />
               </div>
@@ -482,15 +611,38 @@ export default function AdminProductsPage() {
                   Admins are emailed once when stock falls to this level.
                 </p>
               </div>
+              <VariantsEditor
+                variants={form.variants}
+                defaultPrice={form.price}
+                onChange={(variants) => setForm({ ...form, variants })}
+              />
               <div>
                 <Label>Category</Label>
-                <Input
+                <select
                   value={form.category}
-                  onChange={(e) =>
-                    setForm({ ...form, category: e.target.value })
-                  }
-                  placeholder="e.g. Vitamins, Protein"
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="">No category</option>
+                  {categoryNames.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                  {form.category && !categoryNames.includes(form.category) && (
+                    <option value={form.category}>{form.category} (not in list)</option>
+                  )}
+                </select>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Manage the list under <Link href="/admin/categories" className="underline">Categories</Link>.
+                </p>
+              </div>
+              <div>
+                <Label>Tags</Label>
+                <Input
+                  value={form.tags}
+                  onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                  placeholder="vegan, gluten-free, bestseller"
                 />
+                <p className="mt-1 text-[11px] text-muted-foreground">Comma separated, up to 15.</p>
               </div>
               <div>
                 <Label>SKU</Label>
@@ -664,133 +816,20 @@ export default function AdminProductsPage() {
       ) : (
         <div className="space-y-2">
           {filtered.map((product) => (
-            <Card key={product._id} className="border-0 shadow-sm">
-              <CardContent className="flex items-center gap-4 p-4">
-                <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                  {product.images?.[0] ? (
-                    <img
-                      src={product.images[0]}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Package className="h-6 w-6 text-muted" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {product.name}
-                  </p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-wellness-700">
-                      ₹{product.discountPrice && product.discountPrice < product.price ? product.discountPrice : product.price}
-                    </span>
-                    {product.discountPrice && product.discountPrice < product.price && (
-                      <span className="text-muted-foreground line-through text-xs">
-                        ₹{product.price}
-                      </span>
-                    )}
-                    <span className={`text-xs ${product.stock <= (product.lowStockThreshold ?? 10) ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
-                      {product.stock <= 0 ? "Out of Stock" : product.stock <= (product.lowStockThreshold ?? 10) ? `Low: ${product.stock}` : `Stock: ${product.stock}`}
-                    </span>
-                    {product.archivedAt && (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-                        Archived
-                      </span>
-                    )}
-                    {product.isFeatured && (
-                      <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
-                        Featured
-                      </span>
-                    )}
-                    {product.isActive === false && !product.archivedAt && (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
-                        Disabled
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => toggleHistory(product._id)}
-                    className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-                    title="Stock history"
-                    aria-label="Stock history"
-                  >
-                    <History className="h-4 w-4" />
-                  </button>
-                  {product.archivedAt ? (
-                    <>
-                      <button
-                        onClick={() => handleRestore(product._id)}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-                        title="Restore"
-                        aria-label="Restore"
-                      >
-                        <ArchiveRestore className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteForever(product._id, product.name)}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-red-50 hover:text-red-500"
-                        title="Delete permanently"
-                        aria-label="Delete permanently"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-muted-foreground"
-                        title="Edit"
-                        aria-label="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleArchive(product._id)}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-red-50 hover:text-red-500"
-                        title="Archive"
-                        aria-label="Archive"
-                      >
-                        <Archive className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-              {historyFor === product._id && (
-                <div className="border-t px-4 pb-4 pt-3">
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">Stock history (latest 50)</p>
-                  {loadingHistory ? (
-                    <Skeleton className="h-10 w-full rounded" />
-                  ) : history.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No stock changes recorded yet.</p>
-                  ) : (
-                    <ul className="max-h-56 space-y-1 overflow-y-auto text-xs">
-                      {history.map((m) => (
-                        <li key={m._id} className="flex items-center justify-between gap-2 rounded bg-muted/50 px-2 py-1">
-                          <span>
-                            <span className={`font-semibold ${m.delta > 0 ? "text-green-600" : "text-red-600"}`}>
-                              {m.delta > 0 ? `+${m.delta}` : m.delta}
-                            </span>{" "}
-                            <span className="capitalize">{m.reason.replace("_", " ")}</span>
-                            {m.actorName ? ` · ${m.actorName}` : ""}
-                            {m.balance !== undefined ? ` · now ${m.balance}` : ""}
-                          </span>
-                          <span className="shrink-0 text-muted-foreground">
-                            {new Date(m.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </Card>
+            <ProductRow
+              key={product._id}
+              product={product}
+              checked={checked.has(product._id)}
+              onToggle={() => toggleChecked(product._id)}
+              historyOpen={historyFor === product._id}
+              history={history}
+              loadingHistory={loadingHistory}
+              onToggleHistory={() => toggleHistory(product._id)}
+              onEdit={() => handleEdit(product)}
+              onArchive={() => handleArchive(product._id)}
+              onRestore={() => handleRestore(product._id)}
+              onDeleteForever={() => handleDeleteForever(product._id, product.name)}
+            />
           ))}
         </div>
       )}

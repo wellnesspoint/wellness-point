@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import connectDB from "./db";
 import User from "@/models/User";
+import { effectiveRole } from "./permissions";
 
 const ADMIN_COOKIE = "admin-token";
 const EXPIRY = "7d";
@@ -31,6 +32,8 @@ interface AdminPayload {
     email: string;
     name: string;
     role: "admin";
+    /** resolved staff role (legacy admins without one are owners) */
+    adminRole?: "owner" | "manager" | "support" | "content";
 }
 
 export function signAdminToken(payload: Omit<AdminPayload, "role">): string {
@@ -52,7 +55,7 @@ export async function verifyAdminToken(): Promise<AdminPayload | null> {
         // access for the token's full 7-day life. This costs one lean query
         // per admin API request, which is acceptable given admin traffic volume.
         await connectDB();
-        const dbUser = await User.findById(decoded.id).select("role isActive passwordChangedAt").lean();
+        const dbUser = await User.findById(decoded.id).select("role isActive passwordChangedAt adminRole").lean();
         if (!dbUser || dbUser.role !== "admin" || !dbUser.isActive) {
             return null;
         }
@@ -68,7 +71,8 @@ export async function verifyAdminToken(): Promise<AdminPayload | null> {
             return null;
         }
 
-        return decoded;
+        // The role comes from the DB (not the token) so a demotion applies immediately.
+        return { ...decoded, adminRole: effectiveRole(dbUser.adminRole) };
     } catch {
         return null;
     }

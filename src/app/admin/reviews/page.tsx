@@ -1,7 +1,7 @@
 "use client";
 
 import { useConfirm } from "@/components/admin/ConfirmProvider";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +15,10 @@ import {
   Search,
   Reply,
   Send,
+  Download,
 } from "lucide-react";
+import Pagination, { useDebounced } from "@/components/admin/Pagination";
+import { downloadCsv } from "@/lib/csv";
 import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
 import { REVIEW_REPLIES, fillReply } from "@/lib/canned-replies";
@@ -39,25 +42,109 @@ export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
   const [filter, setFilter] = useState<"all" | "pending" | "approved">("all");
+  const [rating, setRating] = useState("");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ total: 0, pages: 1, limit: 20 });
+  const [counts, setCounts] = useState({ all: 0, pending: 0, approved: 0 });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
 
-  const fetchReviews = async () => {
+  const buildQuery = useCallback(
+    (extra: Record<string, string> = {}) => {
+      const p = new URLSearchParams({ status: filter, ...extra });
+      if (rating) p.set("rating", rating);
+      if (debouncedSearch.trim()) p.set("q", debouncedSearch.trim());
+      return p.toString();
+    },
+    [filter, rating, debouncedSearch]
+  );
+
+  const fetchReviews = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/reviews");
+      const res = await fetch(`/api/admin/reviews?${buildQuery({ page: String(page) })}`);
       const data = await res.json();
+      if (!res.ok) throw new Error();
       setReviews(data.reviews || []);
+      setMeta({ total: data.total, pages: data.pages, limit: data.limit });
+      setCounts(data.counts);
+      setSelected(new Set());
     } catch {
-      //
+      toast.error("Failed to load reviews");
     } finally {
       setLoading(false);
     }
-  };
+  }, [buildQuery, page]);
+
+  // Any filter change goes back to page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [filter, rating, debouncedSearch]);
 
   useEffect(() => {
     fetchReviews();
-  }, []);
+  }, [fetchReviews]);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const bulk = async (action: "approve" | "unapprove" | "delete") => {
+    if (selected.size === 0) return;
+    if (
+      action === "delete" &&
+      !(await confirm(`Delete ${selected.size} review(s) permanently?`))
+    )
+      return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/reviews/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selected], action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success(`${data.affected} review(s) updated`);
+      await fetchReviews();
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "Bulk action failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    try {
+      const res = await fetch(`/api/admin/reviews?${buildQuery({ all: "1" })}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error();
+      downloadCsv(
+        `reviews-${new Date().toISOString().slice(0, 10)}.csv`,
+        ["Date", "Product", "Name", "Email", "Rating", "Title", "Content", "Status", "Admin reply"],
+        (data.reviews as Review[]).map((r) => [
+          new Date(r.createdAt).toISOString().slice(0, 10),
+          r.product?.name ?? "Deleted product",
+          r.name,
+          r.email,
+          r.rating,
+          r.title,
+          r.content,
+          r.isApproved ? "Approved" : "Pending",
+          r.adminReply ?? "",
+        ])
+      );
+    } catch {
+      toast.error("Export failed");
+    }
+  };
 
   const handleApprove = async (id: string) => {
     try {
@@ -67,10 +154,8 @@ export default function AdminReviewsPage() {
         body: JSON.stringify({ isApproved: true }),
       });
       if (!res.ok) throw new Error();
-      setReviews((prev) =>
-        prev.map((r) => (r._id === id ? { ...r, isApproved: true } : r))
-      );
       toast.success("Review approved");
+      fetchReviews();
     } catch {
       toast.error("Failed to approve");
     }
@@ -84,10 +169,8 @@ export default function AdminReviewsPage() {
         body: JSON.stringify({ isApproved: false }),
       });
       if (!res.ok) throw new Error();
-      setReviews((prev) =>
-        prev.map((r) => (r._id === id ? { ...r, isApproved: false } : r))
-      );
       toast.success("Review rejected");
+      fetchReviews();
     } catch {
       toast.error("Failed to reject");
     }
@@ -100,8 +183,8 @@ export default function AdminReviewsPage() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error();
-      setReviews((prev) => prev.filter((r) => r._id !== id));
       toast.success("Review deleted");
+      fetchReviews();
     } catch {
       toast.error("Failed to delete");
     }
@@ -134,20 +217,8 @@ export default function AdminReviewsPage() {
     }
   };
 
-  const filtered = reviews
-    .filter((r) => {
-      if (filter === "pending") return !r.isApproved;
-      if (filter === "approved") return r.isApproved;
-      return true;
-    })
-    .filter(
-      (r) =>
-        r.name.toLowerCase().includes(search.toLowerCase()) ||
-        r.title.toLowerCase().includes(search.toLowerCase()) ||
-        r.product?.name?.toLowerCase().includes(search.toLowerCase())
-    );
-
-  const pendingCount = reviews.filter((r) => !r.isApproved).length;
+  const filtered = reviews;
+  const pendingCount = counts.pending;
 
   if (loading) {
     return (
@@ -164,7 +235,7 @@ export default function AdminReviewsPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-foreground">
-          Reviews ({reviews.length})
+          Reviews ({counts.all})
           {pendingCount > 0 && (
             <span className="ml-2 rounded-full bg-yellow-100 px-2.5 py-0.5 text-sm font-medium text-yellow-700">
               {pendingCount} pending
@@ -181,6 +252,20 @@ export default function AdminReviewsPage() {
               className="pl-9"
             />
           </div>
+          <select
+            value={rating}
+            onChange={(e) => setRating(e.target.value)}
+            className="rounded-lg border bg-background px-3 text-sm"
+            aria-label="Filter by rating"
+          >
+            <option value="">All ratings</option>
+            {[5, 4, 3, 2, 1].map((n) => (
+              <option key={n} value={n}>{n} ★</option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" className="h-auto" onClick={exportCsv}>
+            <Download className="mr-1 h-4 w-4" /> CSV
+          </Button>
         </div>
       </div>
 
@@ -196,10 +281,28 @@ export default function AdminReviewsPage() {
                 : "bg-muted text-muted-foreground hover:bg-accent"
             }`}
           >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
+            {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
           </button>
         ))}
       </div>
+
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-2 text-sm">
+          <span className="px-1 font-medium">{selected.size} selected</span>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("approve")}>
+            <Check className="mr-1 h-3.5 w-3.5" /> Approve
+          </Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("unapprove")}>
+            <X className="mr-1 h-3.5 w-3.5" /> Unapprove
+          </Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulk("delete")}>
+            <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {/* Reviews List */}
       {filtered.length === 0 ? (
@@ -215,6 +318,13 @@ export default function AdminReviewsPage() {
             <Card key={review._id} className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(review._id)}
+                    onChange={() => toggle(review._id)}
+                    className="mt-1 h-4 w-4 shrink-0"
+                    aria-label={`Select review by ${review.name}`}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <span className="font-semibold text-sm text-foreground">
@@ -363,6 +473,14 @@ export default function AdminReviewsPage() {
           ))}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        pages={meta.pages}
+        total={meta.total}
+        limit={meta.limit}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

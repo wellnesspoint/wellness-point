@@ -9,7 +9,7 @@ import { logAudit } from "@/lib/audit";
 /** GET /api/admin/coupons — all coupons with how often each has been used (paid, not cancelled). */
 export async function GET() {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("coupons", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();
@@ -49,7 +49,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("coupons", "manage");
     if (!session) return unauthorizedResponse();
 
     const parsed = parseCoupon(await req.json().catch(() => null), true);

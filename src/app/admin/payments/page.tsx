@@ -306,7 +306,34 @@ export default function AdminPaymentsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* Phones: one card per transaction */}
+        <div className="space-y-2 md:hidden">
+          {orders.map((order) => (
+            <div key={order._id} className="rounded-xl border bg-card p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs">#{order._id.slice(-8).toUpperCase()}</span>
+                <span className="font-semibold">₹{calcOrderTotal(order).toLocaleString("en-IN")}</span>
+              </div>
+              <p className="mt-0.5 truncate text-sm font-medium">
+                {order.user?.name || order.shippingAddress?.fullName || "—"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">{order.user?.email || ""}</p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColor[order.paymentStatus]}`}>
+                  {order.paymentStatus}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                </span>
+              </div>
+              {order.razorpayPaymentId && (
+                <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">{order.razorpayPaymentId}</p>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
@@ -347,6 +374,7 @@ export default function AdminPaymentsPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <Pagination

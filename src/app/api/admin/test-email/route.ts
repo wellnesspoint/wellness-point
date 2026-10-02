@@ -12,7 +12,7 @@ import nodemailer from "nodemailer";
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("settings", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json().catch(() => ({}));

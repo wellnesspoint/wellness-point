@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FALLBACK_IMAGE } from "@/lib/constants";
 import { useCartStore } from "@/store/cart";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 interface WishlistProduct {
@@ -24,6 +25,7 @@ export default function WishlistPage() {
   const [products, setProducts] = useState<WishlistProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const addItem = useCartStore((s) => s.addItem);
+  const router = useRouter();
 
   const fetchWishlist = async () => {
     try {
@@ -56,6 +58,11 @@ export default function WishlistPage() {
   };
 
   const handleAddToCart = (product: WishlistProduct) => {
+    if ((product as { variants?: unknown[] }).variants?.length) {
+      toast("Choose an option on the product page first");
+      router.push(`/product/${product.slug}`);
+      return;
+    }
     addItem({
       _id: product._id,
       name: product.name,

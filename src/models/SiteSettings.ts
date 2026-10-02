@@ -8,6 +8,9 @@ export interface ISiteSettings extends Document {
   supportEmail: string;
   website: string;
   phone?: string;
+  /** storefront shows a maintenance page (admin and API keep working) */
+  maintenanceMode?: boolean;
+  maintenanceMessage?: string;
   updatedAt: Date;
 }
 
@@ -20,6 +23,8 @@ const siteSettingsSchema = new Schema<ISiteSettings>(
     supportEmail: { type: String, trim: true, lowercase: true },
     website: { type: String, trim: true, maxlength: 100 },
     phone: { type: String, trim: true, maxlength: 20 },
+    maintenanceMode: { type: Boolean, default: false },
+    maintenanceMessage: { type: String, trim: true, maxlength: 300 },
   },
   { timestamps: true }
 );

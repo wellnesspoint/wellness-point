@@ -1,5 +1,6 @@
 "use client";
 
+import { lineKey } from "@/lib/variants";
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -49,7 +50,7 @@ export default function CartSidebar() {
           </div>
           <button
             onClick={closeCart}
-            className="rounded-lg p-1 text-muted-foreground hover:bg-accent"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"
             aria-label="Close cart"
           >
             <X className="h-5 w-5" />
@@ -75,10 +76,10 @@ export default function CartSidebar() {
             <div className="space-y-4">
               {items.map((item) => (
                 <CartItemCard
-                  key={item._id}
+                  key={lineKey(item._id, item.variantId)}
                   item={item}
-                  onRemove={() => removeItem(item._id)}
-                  onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
+                  onRemove={() => removeItem(lineKey(item._id, item.variantId))}
+                  onUpdateQuantity={(qty) => updateQuantity(lineKey(item._id, item.variantId), qty)}
                 />
               ))}
             </div>
@@ -161,6 +162,9 @@ function CartItemCard({
             className="text-sm font-medium text-foreground hover:text-wellness-600"
           >
             {item.name}
+            {item.variantName && (
+              <span className="block text-xs font-normal text-muted-foreground">{item.variantName}</span>
+            )}
           </Link>
           <button
             onClick={onRemove}

@@ -310,7 +310,7 @@ async function seed() {
           content:
             "Protein supplements are one of the most popular categories in the wellness industry. Here's everything you need to know.\n\n## Types of Protein Powders\n\n### Whey Protein Isolate\nHighest protein concentration (90%+), minimal lactose and fat. Ideal for lean muscle building.\n\n### Whey Concentrate\nMore affordable option with 70-80% protein. Contains more natural fats and carbs.\n\n### Plant-Based Protein\nMade from pea, rice, hemp, or soy. Great for vegans and those with dairy sensitivity.\n\n## How Much Protein Do You Need?\nGeneral guideline: 1.6-2.2g per kg of body weight for active individuals.\n\n## When to Take Protein\nPost-workout (within 30 minutes), between meals, or before bed for overnight muscle recovery.",
           coverImage:
-            "https://images.unsplash.com/photo-1593095948071-474c5cc2c4d8?w=800",
+            "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800",
           tags: ["Protein", "Fitness", "Nutrition", "Guide"],
           isPublished: true,
           metaTitle: "Complete Guide to Choosing Protein Powder | Wellness Point Blog",

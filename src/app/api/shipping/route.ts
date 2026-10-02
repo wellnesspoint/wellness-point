@@ -10,7 +10,7 @@ import { DEFAULT_SHIPPING } from "@/lib/shipping";
 export async function GET() {
   try {
     await connectDB();
-    type ShippingConfig = { flatRate: number; freeShippingThreshold: number; enableFreeShipping: boolean; estimatedDays: number; estimatedDaysMax: number; shippingNote: string };
+    type ShippingConfig = { flatRate: number; freeShippingThreshold: number; enableFreeShipping: boolean; estimatedDays: number; estimatedDaysMax: number; shippingNote: string; zones?: { name?: string; states: string[]; rate: number; estimatedDays?: number }[] };
     const raw = await ShippingSettings.findOne().lean() as ShippingConfig | null;
 
     const settings: ShippingConfig = raw ?? {
@@ -27,6 +27,12 @@ export async function GET() {
       estimatedDays: settings.estimatedDays,
       estimatedDaysMax: settings.estimatedDaysMax,
       shippingNote: settings.shippingNote,
+      zones: (settings.zones ?? []).map((z) => ({
+        name: z.name,
+        states: z.states,
+        rate: z.rate,
+        estimatedDays: z.estimatedDays,
+      })),
     });
   } catch (error) {
     console.error("Shipping settings public GET error:", error);

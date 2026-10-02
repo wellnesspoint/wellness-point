@@ -4,6 +4,8 @@ export type StockReason = "order" | "cancel" | "refund" | "admin_edit" | "restoc
 
 export interface IStockMovement extends Document {
   product: mongoose.Types.ObjectId;
+  variantId?: mongoose.Types.ObjectId;
+  variantName?: string;
   /** signed change: negative = stock left, positive = stock added */
   delta: number;
   reason: StockReason;
@@ -17,6 +19,8 @@ export interface IStockMovement extends Document {
 const stockMovementSchema = new Schema<IStockMovement>(
   {
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+    variantId: { type: Schema.Types.ObjectId },
+    variantName: { type: String },
     delta: { type: Number, required: true },
     reason: {
       type: String,

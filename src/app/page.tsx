@@ -19,7 +19,7 @@ export default async function HomePage() {
   const now = new Date();
   const [products, testimonials, banners] = await Promise.all([
     Product.find({ isActive: true })
-      .select("name slug price discountPrice images shortDescription rating reviewCount stock")
+      .select("name slug price discountPrice images shortDescription rating reviewCount stock variants")
       .sort({ createdAt: -1 })
       .limit(12)
       .lean(),

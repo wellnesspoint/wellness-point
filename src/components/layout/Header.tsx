@@ -86,7 +86,7 @@ export default function Header() {
 
           <button
             onClick={openCart}
-            className="relative rounded-full p-2 text-muted-foreground transition-colors hover:bg-wellness-50 hover:text-wellness-600"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-wellness-50 hover:text-wellness-600"
             aria-label="Shopping cart"
           >
             <ShoppingCart className="h-5 w-5" />
@@ -164,7 +164,7 @@ export default function Header() {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="rounded-full p-2 text-foreground md:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-foreground md:hidden"
             aria-label="Toggle menu"
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

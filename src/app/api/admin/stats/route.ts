@@ -6,7 +6,7 @@ import Product from "@/models/Product";
 import User from "@/models/User";
 import NewsletterSubscriber from "@/models/NewsletterSubscriber";
 import { calcOrderTotal } from "@/lib/order-math";
-import { IST_OFFSET_MS } from "@/lib/dates";
+import { IST_OFFSET_MS, DAY_MS } from "@/lib/dates";
 
 // Totals are derived from line items (see lib/order-math), expressed for Mongo.
 const ITEM_AMOUNT = {
@@ -39,8 +39,22 @@ const ORDER_TOTAL_STAGE = {
   },
 };
 
+const ITEMS_SUM = {
+  $sum: {
+    $map: {
+      input: { $ifNull: ["$items", []] },
+      as: "i",
+      in: { $multiply: [{ $ifNull: ["$$i.price", 0] }, { $ifNull: ["$$i.quantity", 1] }] },
+    },
+  },
+};
+// what the order totals before any refund: items + shipping - discount
+const GROSS = {
+  $subtract: [{ $add: [ITEMS_SUM, { $ifNull: ["$shipping", 0] }] }, { $ifNull: ["$discount", 0] }],
+};
+
 export async function GET() {
-  const session = await checkAdmin();
+  const session = await checkAdmin("reports", "view");
   if (!session) return unauthorizedResponse();
 
   await connectDB();
@@ -120,6 +134,55 @@ export async function GET() {
         .lean(),
     ]);
 
+    // Yesterday's sales (for the "vs yesterday" change), the best customers, and the refund rate.
+    const yesterdayStart = new Date(todayStart.getTime() - DAY_MS);
+    const [yesterdayAgg, topCustomerAgg, refundAgg] = await Promise.all([
+      Order.aggregate([
+        { $match: { createdAt: { $gte: yesterdayStart, $lt: todayStart }, paymentStatus: "paid" } },
+        ORDER_TOTAL_STAGE,
+        { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: "$amount" } } },
+      ]),
+      Order.aggregate([
+        { $match: { paymentStatus: "paid", user: { $exists: true } } },
+        {
+          $project: {
+            user: 1,
+            // net of discount and partial refunds, same as revenue everywhere else
+            amount: { $subtract: [GROSS, { $ifNull: ["$refundedAmount", 0] }] },
+          },
+        },
+        { $group: { _id: "$user", orders: { $sum: 1 }, spent: { $sum: "$amount" } } },
+        { $sort: { spent: -1 } },
+        { $limit: 5 },
+        { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "u" } },
+        {
+          $project: {
+            orders: 1,
+            spent: 1,
+            name: { $arrayElemAt: ["$u.name", 0] },
+            email: { $arrayElemAt: ["$u.email", 0] },
+          },
+        },
+      ]),
+      // Refund rate = money returned (full refunds + partial refunds) / money collected.
+      Order.aggregate([
+        { $match: { paymentStatus: { $in: ["paid", "refunded"] } } },
+        {
+          $group: {
+            _id: null,
+            collected: { $sum: GROSS },
+            refunded: {
+              $sum: {
+                $cond: [{ $eq: ["$paymentStatus", "refunded"] }, GROSS, { $ifNull: ["$refundedAmount", 0] }],
+              },
+            },
+          },
+        },
+      ]),
+    ]);
+    const collected: number = refundAgg[0]?.collected ?? 0;
+    const refundedMoney: number = refundAgg[0]?.refunded ?? 0;
+
     let totalOrders = 0;
     let totalRevenue = 0;
     let pendingOrders = 0;
@@ -141,6 +204,16 @@ export async function GET() {
       totalRevenue,
       todaySales: todayAgg[0]?.amount ?? 0,
       todayOrderCount: todayAgg[0]?.count ?? 0,
+      yesterdaySales: yesterdayAgg[0]?.amount ?? 0,
+      yesterdayOrderCount: yesterdayAgg[0]?.count ?? 0,
+      topCustomers: topCustomerAgg.map((c) => ({
+        name: c.name || "Customer",
+        email: c.email || "",
+        orders: c.orders,
+        spent: c.spent,
+      })),
+      refundedAmount: refundedMoney,
+      refundRate: collected > 0 ? refundedMoney / collected : 0,
       totalOrders,
       pendingOrders,
       totalCustomers,

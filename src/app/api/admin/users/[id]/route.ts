@@ -6,13 +6,14 @@ import Order from "@/models/Order";
 import { calcOrderTotal } from "@/lib/order-math";
 import { removeUsers } from "@/lib/user-deletion";
 import { logAudit } from "@/lib/audit";
+import { can, ADMIN_ROLES } from "@/lib/permissions";
 import { USER_PUBLIC_FIELDS } from "@/lib/user-fields";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await checkAdmin();
+  const session = await checkAdmin("customers", "view");
   if (!session) return unauthorizedResponse();
 
   const { id } = await params;
@@ -47,7 +48,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await checkAdmin();
+  const session = await checkAdmin("customers", "manage");
   if (!session) return unauthorizedResponse();
 
   const { id } = await params;
@@ -63,13 +64,29 @@ export async function PUT(
         return NextResponse.json({ error: "isActive must be a boolean" }, { status: 400 });
       }
       updateFields.isActive = body.isActive;
+      // Blocking an admin account is a team action, not a customer-support one.
+      if (!can(session.user.adminRole, "team", "manage")) {
+        const target = await User.findById(id).select("role").lean();
+        if (target?.role === "admin") {
+          return NextResponse.json({ error: "Only an owner can block an admin account" }, { status: 403 });
+        }
+      }
     }
 
     if (body.role !== undefined) {
       if (body.role !== "user" && body.role !== "admin") {
         return NextResponse.json({ error: "Invalid role" }, { status: 400 });
       }
+      // Granting or removing admin access is a team-management action.
+      if (!can(session.user.adminRole, "team", "manage")) {
+        return NextResponse.json({ error: "Only an owner can change admin access" }, { status: 403 });
+      }
       updateFields.role = body.role;
+      // New admins start with the least-privileged staff role; an owner can raise it on the Team page.
+      if (body.role === "admin") {
+        const current = await User.findById(id).select("role adminRole").lean();
+        if (current?.role !== "admin") updateFields.adminRole = "support";
+      }
     }
 
     // An admin must not lock themselves out (deactivate or demote their own
@@ -117,7 +134,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await checkAdmin();
+  const session = await checkAdmin("customers", "manage");
   if (!session) return unauthorizedResponse();
 
   const { id } = await params;

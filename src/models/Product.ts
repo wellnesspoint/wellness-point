@@ -1,5 +1,21 @@
 import mongoose, { Document, Schema, Model } from "mongoose";
 
+/**
+ * A purchasable option of a product (size, flavour...). When a product has
+ * variants, `Product.stock` is kept equal to the sum of its variants' stock and
+ * `price`/`discountPrice` mirror the cheapest active variant (the "from" price),
+ * so lists, alerts and storefront cards keep working unchanged.
+ */
+export interface IProductVariant {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  sku?: string;
+  price: number;
+  discountPrice?: number;
+  stock: number;
+  isActive: boolean;
+}
+
 export interface IProduct extends Document {
   name: string;
   slug: string;
@@ -21,6 +37,8 @@ export interface IProduct extends Document {
   weight?: number;
   gst?: number;
   category?: string;
+  tags?: string[];
+  variants?: IProductVariant[];
   isFeatured: boolean;
   isActive: boolean;
   rating: number;
@@ -30,6 +48,15 @@ export interface IProduct extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+const variantSchema = new Schema<IProductVariant>({
+  name: { type: String, required: true, trim: true, maxlength: 80 },
+  sku: { type: String, trim: true },
+  price: { type: Number, required: true, min: 0 },
+  discountPrice: { type: Number, min: 0 },
+  stock: { type: Number, required: true, default: 0, min: 0 },
+  isActive: { type: Boolean, default: true },
+});
 
 const productSchema = new Schema<IProduct>(
   {
@@ -51,6 +78,8 @@ const productSchema = new Schema<IProduct>(
     weight: { type: Number, min: 0 },
     gst: { type: Number, min: 0, max: 100, default: 18 },
     category: { type: String, trim: true },
+    tags: [{ type: String, trim: true, lowercase: true }],
+    variants: { type: [variantSchema], default: undefined },
     isFeatured: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     rating: { type: Number, default: 0, min: 0, max: 5 },

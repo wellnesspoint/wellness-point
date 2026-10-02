@@ -179,3 +179,33 @@ export function getInitials(name: string): string {
 
 export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Wellness Point";
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+
+/** Clean a list of product tags: trimmed, lower-cased, de-duplicated, max 15 of max 30 chars. */
+export function normalizeTags(input: unknown): string[] {
+  const raw = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(",")
+      : [];
+  const out: string[] = [];
+  for (const t of raw) {
+    const tag = String(t ?? "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 30);
+    if (tag && !out.includes(tag)) out.push(tag);
+    if (out.length >= 15) break;
+  }
+  return out;
+}
+
+
+/**
+ * Ask Cloudinary for a right-sized, auto-format (WebP/AVIF) copy of an image instead of the
+ * full-size original. Only touches res.cloudinary.com delivery URLs that have no
+ * transformation yet; anything else (Unsplash, local files...) is returned unchanged.
+ */
+export function cloudinaryUrl(url: string | undefined | null, width: number): string {
+  if (!url) return "";
+  const m = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(v\d+\/.*)$/);
+  if (!m) return url;
+  return `${m[1]}f_auto,q_auto,c_limit,w_${Math.max(16, Math.round(width))}/${m[2]}`;
+}

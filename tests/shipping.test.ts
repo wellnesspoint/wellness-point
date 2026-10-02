@@ -22,3 +22,29 @@ describe("computeShipping", () => {
     expect(computeShipping(10, { flatRate: 0 })).toBe(0);
   });
 });
+
+describe("computeShipping zones", () => {
+  const cfg = {
+    flatRate: 50,
+    freeShippingThreshold: 1000,
+    enableFreeShipping: true,
+    zones: [
+      { name: "North East", states: ["Assam", "Meghalaya"], rate: 120 },
+      { name: "Local", states: ["Delhi"], rate: 0 },
+    ],
+  };
+
+  it("uses the zone rate when the state matches (case/space-insensitive)", () => {
+    expect(computeShipping(200, cfg, "  assam ")).toBe(120);
+    expect(computeShipping(200, cfg, "DELHI")).toBe(0);
+  });
+
+  it("falls back to the flat rate for unmatched or missing states", () => {
+    expect(computeShipping(200, cfg, "Kerala")).toBe(50);
+    expect(computeShipping(200, cfg)).toBe(50);
+  });
+
+  it("still gives free shipping above the threshold in any zone", () => {
+    expect(computeShipping(1000, cfg, "Assam")).toBe(0);
+  });
+});

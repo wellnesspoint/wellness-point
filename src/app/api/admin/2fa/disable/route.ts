@@ -15,7 +15,7 @@ import { logAudit } from "@/lib/audit";
  */
 export async function POST(req: Request) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("self", "manage");
     if (!session) return unauthorizedResponse();
 
     const { code: rawCode } = await req.json().catch(() => ({}));

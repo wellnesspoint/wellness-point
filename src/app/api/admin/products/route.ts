@@ -3,14 +3,15 @@ import connectDB from "@/lib/db";
 import Product from "@/models/Product";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
 import { escapeRegex, pageMeta, parsePagination } from "@/lib/pagination";
-import { generateSlug, sanitizeInput, truncateText } from "@/lib/utils";
+import { generateSlug, normalizeTags, sanitizeInput, truncateText } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
+import { parseVariants, summarizeVariants, type VariantInput } from "@/lib/variants";
 import { checkLowStock, logStockMovements } from "@/lib/stock";
 
 /** GET /api/admin/products?page=&limit=&q=&status=active|inactive|archived&stock=low|out (archived are hidden unless asked for) */
 export async function GET(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("products", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();
@@ -41,10 +42,12 @@ export async function GET(req: NextRequest) {
       filter.$expr = { $lte: ["$stock", { $ifNull: ["$lowStockThreshold", 10] }] };
     }
 
-    const [products, total] = await Promise.all([
-      Product.find(filter).sort({ createdAt: -1 }).skip(paging.skip).limit(paging.limit).lean(),
-      Product.countDocuments(filter),
-    ]);
+    // ?all=1 is the CSV-export mode (capped, no paging)
+    const exportAll = sp.get("all") === "1";
+    const listQuery = Product.find(filter).sort({ createdAt: -1 });
+    if (exportAll) listQuery.limit(5000);
+    else listQuery.skip(paging.skip).limit(paging.limit);
+    const [products, total] = await Promise.all([listQuery.lean(), Product.countDocuments(filter)]);
     return NextResponse.json({ products, ...pageMeta(total, paging) });
   } catch (error) {
     console.error("Admin products error:", error);
@@ -54,7 +57,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("products", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json();
@@ -129,6 +132,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "GST must be between 0 and 100" }, { status: 400 });
     }
 
+    // Optional variants: product stock/price then mirror them (lib/variants.ts)
+    let variantDocs: VariantInput[] = [];
+    let variantSummary: ReturnType<typeof summarizeVariants> | null = null;
+    if (body.variants !== undefined && Array.isArray(body.variants) && body.variants.length > 0) {
+      const parsed = parseVariants(body.variants);
+      if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      variantDocs = parsed.variants.map((v) => ({ ...v, _id: undefined }));
+      variantSummary = summarizeVariants(variantDocs);
+    }
+
     await connectDB();
 
     const slug = generateSlug(name);
@@ -142,18 +155,20 @@ export async function POST(req: NextRequest) {
       slug: finalSlug,
       description,
       shortDescription,
-      price,
-      discountPrice: discountPrice || undefined,
+      price: variantSummary ? variantSummary.price : price,
+      discountPrice: variantSummary ? variantSummary.discountPrice : discountPrice || undefined,
+      variants: variantSummary ? variantDocs : undefined,
       images: images || [],
       ingredients: ingredients || [],
       benefits: benefits || [],
       usage: usage || "",
-      stock,
+      stock: variantSummary ? variantSummary.stock : stock,
       lowStockThreshold,
       sku: sku || undefined,
       weight,
       gst,
       category: category || undefined,
+      tags: normalizeTags(body.tags),
       isFeatured: isFeatured || false,
       isActive: isActive === undefined ? true : Boolean(isActive),
       metaTitle,
@@ -161,7 +176,7 @@ export async function POST(req: NextRequest) {
     });
 
     await logStockMovements([
-      { product: product._id, delta: stock, reason: "restock", actorName: session.user.name || session.user.email, balance: stock },
+      { product: product._id, delta: product.stock, reason: "restock", actorName: session.user.name || session.user.email, balance: product.stock },
     ]);
     await checkLowStock();
     await logAudit(session, {

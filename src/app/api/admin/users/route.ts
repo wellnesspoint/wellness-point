@@ -19,7 +19,7 @@ const EXPORT_LIMIT = 5000;
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("customers", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("customers", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json().catch(() => null);

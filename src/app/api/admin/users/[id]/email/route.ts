@@ -13,7 +13,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("customers", "manage");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;

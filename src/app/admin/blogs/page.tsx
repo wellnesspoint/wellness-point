@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, X, FileText, Upload, ImageIcon } from "lucide-react";
+import { cloudinaryUrl } from "@/lib/utils";
 import toast from "react-hot-toast";
 
 interface Blog {
@@ -283,6 +284,7 @@ export default function AdminBlogsPage() {
                   <div className="relative mt-2 inline-block">
                     <img
                       src={form.coverImage}
+                      onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
                       alt="Cover"
                       className="h-40 w-full max-w-sm rounded-lg border object-cover"
                     />
@@ -318,6 +320,7 @@ export default function AdminBlogsPage() {
                     <div key={idx} className="relative">
                       <img
                         src={img}
+                        onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
                         alt={`Gallery ${idx + 1}`}
                         className="h-24 w-24 rounded-lg border object-cover"
                       />
@@ -411,7 +414,9 @@ export default function AdminBlogsPage() {
                 <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                   {blog.coverImage ? (
                     <img
-                      src={blog.coverImage}
+                      src={cloudinaryUrl(blog.coverImage, 160)}
+                      loading="lazy"
+                      onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
                       alt={blog.title}
                       className="h-full w-full object-cover"
                     />

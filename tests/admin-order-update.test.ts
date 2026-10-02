@@ -27,7 +27,7 @@ vi.mock("@/lib/razorpay", () => ({
   default: { payments: { refund: (...a: unknown[]) => refund(...a) } },
 }));
 vi.mock("@/models/Product", () => ({
-  default: { findByIdAndUpdate: (...a: unknown[]) => productUpdate(...a) },
+  default: { updateOne: (...a: unknown[]) => productUpdate(...a) },
 }));
 vi.mock("@/models/Order", () => ({
   default: {
@@ -90,7 +90,7 @@ describe("PUT /api/admin/orders/[id]", () => {
     const res = await call({ paymentStatus: "refunded" });
     expect(res.status).toBe(200);
     expect(refund).toHaveBeenCalledWith("pay_1", expect.objectContaining({ speed: "normal" }));
-    expect(productUpdate).toHaveBeenCalledWith("p1", { $inc: { stock: 2 } });
+    expect(productUpdate).toHaveBeenCalledWith({ _id: "p1" }, { $inc: { stock: 2 } });
     expect(logStockMovements.mock.calls[0][0][0]).toMatchObject({ delta: 2, reason: "refund", actorName: "Admin" });
     expect(sendStatusEmail).toHaveBeenCalledWith(expect.objectContaining({ type: "refunded", customerEmail: "c@example.com" }));
     expect(logAudit.mock.calls[0][1]).toMatchObject({ action: "order.refund", entity: "order" });

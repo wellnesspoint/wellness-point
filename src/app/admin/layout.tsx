@@ -4,8 +4,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import ConfirmProvider from "@/components/admin/ConfirmProvider";
+import { canViewPage, ROLE_LABELS, type AdminRole } from "@/lib/permissions";
 import Image from "next/image";
 import {
+  Boxes,
+  Globe,
+  Tags,
+  UserCog,
   LayoutDashboard,
   Package,
   FileText,
@@ -36,6 +41,8 @@ type BadgeKey = "orders" | "contacts" | "reviews" | "abandoned";
 const adminLinks: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: BadgeKey }[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/products", label: "Products", icon: Package },
+  { href: "/admin/inventory", label: "Inventory", icon: Boxes },
+  { href: "/admin/categories", label: "Categories", icon: Tags },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag, badge: "orders" },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/abandoned", label: "Abandoned Carts", icon: ShoppingCart, badge: "abandoned" },
@@ -48,10 +55,12 @@ const adminLinks: { href: string; label: string; icon: React.ComponentType<{ cla
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/shipping", label: "Shipping", icon: Truck },
+  { href: "/admin/site", label: "Site", icon: Globe },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
   { href: "/admin/audit", label: "Audit Log", icon: History },
   { href: "/admin/settings", label: "Settings", icon: Settings },
   { href: "/admin/security", label: "Security", icon: ShieldCheck },
+  { href: "/admin/team", label: "Team", icon: UserCog },
 ];
 
 interface AdminUser {
@@ -59,6 +68,7 @@ interface AdminUser {
   name: string;
   email: string;
   role: string;
+  adminRole?: AdminRole;
 }
 
 export default function AdminLayout({
@@ -152,8 +162,15 @@ export default function AdminLayout({
           // Other 403s (e.g. "Cannot delete admin users") carry a different message.
           const body = await res.clone().json().catch(() => null);
           if (typeof body?.error === "string" && body.error.startsWith("Unauthorized")) {
-            setAdminUser(null);
-            setAuthStatus("unauthenticated");
+            // The same 403 is used for "your role may not do this", so only sign out
+            // when the session itself is really gone.
+            const check = await originalFetch("/api/admin/auth/session")
+              .then((r) => r.json())
+              .catch(() => null);
+            if (check && !check.authenticated) {
+              setAdminUser(null);
+              setAuthStatus("unauthenticated");
+            }
           }
         }
       } catch {
@@ -235,7 +252,7 @@ export default function AdminLayout({
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-            {adminLinks.map((link) => {
+            {adminLinks.filter((l) => canViewPage(adminUser.adminRole, l.href)).map((link) => {
               const active = pathname === link.href;
               return (
                 <Link
@@ -335,7 +352,21 @@ export default function AdminLayout({
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {children}
+          {canViewPage(adminUser.adminRole, pathname) ? (
+            children
+          ) : (
+            <div className="mx-auto mt-16 max-w-md rounded-xl border bg-card p-8 text-center shadow-sm">
+              <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+              <h1 className="text-lg font-semibold text-foreground">No access to this page</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your role ({ROLE_LABELS[adminUser.adminRole ?? "owner"].label}) can&apos;t open this section.
+                Ask an owner if you need it.
+              </p>
+              <Link href="/admin" className="mt-4 inline-block text-sm font-medium text-emerald-700 hover:underline">
+                Back to dashboard
+              </Link>
+            </div>
+          )}
         </main>
       </div>
     </div>

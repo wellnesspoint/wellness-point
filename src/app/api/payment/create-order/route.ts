@@ -85,7 +85,11 @@ export async function POST(req: NextRequest) {
       // fall through to defaults
     }
     // Free-shipping threshold applies to what the customer actually pays for items.
-    const shipping = computeShipping(subtotal - discount, shippingConfig as any);
+    const shipping = computeShipping(
+      subtotal - discount,
+      shippingConfig as any,
+      validatedAddress.address.state
+    );
     const total = Math.round((subtotal - discount + shipping) * 100) / 100;
 
     if (total < 1) {

@@ -14,7 +14,8 @@ import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { FALLBACK_IMAGE } from "@/lib/constants";
-import { DEFAULT_SHIPPING, computeShipping } from "@/lib/shipping";
+import { lineKey } from "@/lib/variants";
+import { DEFAULT_SHIPPING, computeShipping, type ShippingConfig } from "@/lib/shipping";
 
 declare global {
   interface Window {
@@ -99,7 +100,7 @@ export default function CheckoutPage() {
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
-  const [shippingSettings, setShippingSettings] = useState(DEFAULT_SHIPPING);
+  const [shippingSettings, setShippingSettings] = useState<ShippingConfig>(DEFAULT_SHIPPING);
 
   // Coupon preview — the server re-validates and re-prices at create-order.
   const [couponInput, setCouponInput] = useState("");
@@ -110,7 +111,7 @@ export default function CheckoutPage() {
   const subtotal = getSubtotal();
   const discount = coupon ? Math.min(coupon.discount, subtotal) : 0;
   // Free-shipping threshold applies to what is actually paid for items (matches the server).
-  const shipping = computeShipping(subtotal - discount, shippingSettings);
+  const shipping = computeShipping(subtotal - discount, shippingSettings, address.state);
   const total = subtotal - discount + shipping;
 
   const checkCoupon = useCallback(
@@ -120,7 +121,7 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          items: items.map((i) => ({ _id: i._id, quantity: i.quantity })),
+          items: items.map((i) => ({ _id: i._id, variantId: i.variantId, quantity: i.quantity })),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -175,6 +176,7 @@ export default function CheckoutPage() {
             flatRate: d.flatRate,
             freeShippingThreshold: d.freeShippingThreshold,
             enableFreeShipping: d.enableFreeShipping,
+            zones: d.zones ?? [],
           });
         }
       })
@@ -326,6 +328,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           items: items.map((item) => ({
             _id: item._id,
+            variantId: item.variantId,
             quantity: item.quantity,
           })),
           // Stored on the pending order so the Razorpay webhook can finalize it
@@ -618,7 +621,7 @@ export default function CheckoutPage() {
             <CardContent className="space-y-3">
               {items.map((item) => (
                 <div
-                  key={item._id}
+                  key={lineKey(item._id, item.variantId)}
                   className="flex items-center gap-3"
                 >
                   <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
@@ -635,10 +638,11 @@ export default function CheckoutPage() {
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-medium">
                       {item.name}
+                      {item.variantName ? ` – ${item.variantName}` : ""}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <button
-                        onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                        onClick={() => updateQuantity(lineKey(item._id, item.variantId), item.quantity - 1)}
                         className="flex h-8 w-8 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
                         aria-label="Decrease quantity"
                       >
@@ -646,7 +650,7 @@ export default function CheckoutPage() {
                       </button>
                       <span className="min-w-[20px] text-center text-xs font-medium">{item.quantity}</span>
                       <button
-                        onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                        onClick={() => updateQuantity(lineKey(item._id, item.variantId), item.quantity + 1)}
                         className="flex h-8 w-8 items-center justify-center rounded border text-muted-foreground hover:bg-accent hover:text-foreground"
                         disabled={item.quantity >= item.stock}
                         aria-label="Increase quantity"
@@ -654,7 +658,7 @@ export default function CheckoutPage() {
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => removeItem(item._id)}
+                        onClick={() => removeItem(lineKey(item._id, item.variantId))}
                         className="ml-1 flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-red-50 hover:text-red-500"
                         aria-label="Remove item"
                       >

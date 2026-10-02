@@ -13,7 +13,7 @@ const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/;
 /** GET /api/admin/settings — the effective store details (saved values over built-in defaults). */
 export async function GET() {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("settings", "view");
     if (!session) return unauthorizedResponse();
     return NextResponse.json({ settings: await getCompany(), defaults: COMPANY });
   } catch (error) {
@@ -25,7 +25,7 @@ export async function GET() {
 /** PUT /api/admin/settings — store name, tagline, address, GSTIN, support email, website, phone. */
 export async function PUT(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("settings", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json().catch(() => null);

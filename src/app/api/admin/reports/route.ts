@@ -40,7 +40,7 @@ const IST_DAY = { $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timez
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("reports", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();

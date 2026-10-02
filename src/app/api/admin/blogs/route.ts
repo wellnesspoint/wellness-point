@@ -6,7 +6,7 @@ import { generateSlug, sanitizeInput } from "@/lib/utils";
 
 export async function GET() {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "view");
     if (!session) return unauthorizedResponse();
 
     await connectDB();
@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("content", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json();

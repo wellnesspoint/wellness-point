@@ -21,7 +21,7 @@ const BULK_TARGETS: OrderStatus[] = ["confirmed", "shipped", "delivered"];
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("orders", "manage");
     if (!session) return unauthorizedResponse();
 
     const body = await req.json().catch(() => null);

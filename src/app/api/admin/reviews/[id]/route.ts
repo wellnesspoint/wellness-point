@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import mongoose from "mongoose";
 import connectDB from "@/lib/db";
 import Review from "@/models/Review";
-import Product from "@/models/Product";
 import { checkAdmin, unauthorizedResponse } from "@/lib/admin";
+import { recalculateProductRating } from "@/lib/review-rating";
+import { logAudit } from "@/lib/audit";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -12,7 +12,7 @@ interface Props {
 // PUT /api/admin/reviews/[id] — approve/update review
 export async function PUT(req: NextRequest, { params }: Props) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("reviews", "manage");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;
@@ -42,6 +42,13 @@ export async function PUT(req: NextRequest, { params }: Props) {
     // Recalculate product rating
     await recalculateProductRating(review.product.toString());
 
+    await logAudit(session, {
+      action: "review.update",
+      entity: "review",
+      entityId: id,
+      summary: `Updated review by ${review.name}: ${Object.keys(update).join(", ")}`,
+    });
+
     return NextResponse.json({ review });
   } catch (error) {
     console.error("Admin review update error:", error);
@@ -52,7 +59,7 @@ export async function PUT(req: NextRequest, { params }: Props) {
 // DELETE /api/admin/reviews/[id] — delete review
 export async function DELETE(req: NextRequest, { params }: Props) {
   try {
-    const session = await checkAdmin();
+    const session = await checkAdmin("reviews", "manage");
     if (!session) return unauthorizedResponse();
 
     const { id } = await params;
@@ -67,23 +74,16 @@ export async function DELETE(req: NextRequest, { params }: Props) {
     // Recalculate product rating
     await recalculateProductRating(review.product.toString());
 
+    await logAudit(session, {
+      action: "review.delete",
+      entity: "review",
+      entityId: id,
+      summary: `Deleted review "${review.title}" by ${review.name}`,
+    });
+
     return NextResponse.json({ message: "Review deleted" });
   } catch (error) {
     console.error("Admin review delete error:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-}
-
-async function recalculateProductRating(productId: string) {
-  const [stats] = await Review.aggregate([
-    { $match: { product: new mongoose.Types.ObjectId(productId), isApproved: true } },
-    { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: "$rating" } } },
-  ]);
-  const count: number = stats?.count ?? 0;
-  const avg: number = stats?.avg ?? 0;
-
-  await Product.findByIdAndUpdate(productId, {
-    rating: Math.round(avg * 10) / 10,
-    reviewCount: count,
-  });
 }
