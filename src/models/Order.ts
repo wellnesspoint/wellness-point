@@ -36,8 +36,6 @@ export interface IOrder extends Document {
   stockRestored?: boolean;
   couponCode?: string;
   tracking?: { courier?: string; trackingNumber?: string; trackingUrl?: string };
-  /** shipment created through a courier API (Shiprocket); `creating` is the in-flight claim */
-  shipment?: { provider: string; creating?: boolean; orderId?: number; shipmentId?: number; awb?: string; createdAt?: Date };
   statusHistory?: {
     field: "orderStatus" | "paymentStatus";
     from?: string;
@@ -113,14 +111,6 @@ const orderSchema = new Schema<IOrder>(
       courier: { type: String, trim: true, maxlength: 80 },
       trackingNumber: { type: String, trim: true, maxlength: 80 },
       trackingUrl: { type: String, trim: true, maxlength: 500 },
-    },
-    shipment: {
-      provider: { type: String },
-      creating: { type: Boolean },
-      orderId: { type: Number },
-      shipmentId: { type: Number },
-      awb: { type: String },
-      createdAt: { type: Date },
     },
     // Append-only trail of admin status changes (who/when).
     statusHistory: [

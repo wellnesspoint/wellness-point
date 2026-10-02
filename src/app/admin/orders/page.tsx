@@ -277,41 +277,6 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Shiprocket (only offered when the server has credentials configured)
-  const [shipInfo, setShipInfo] = useState<{ configured: boolean; shipment: { awb?: string } | null } | null>(null);
-  const [creatingShipment, setCreatingShipment] = useState(false);
-  const shipOrderId = selectedOrder?._id;
-  useEffect(() => {
-    setShipInfo(null);
-    if (!shipOrderId) return;
-    fetch(`/api/admin/orders/${shipOrderId}/shipment`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setShipInfo(d))
-      .catch(() => {});
-  }, [shipOrderId]);
-
-  const createShipment = async () => {
-    if (!selectedOrder) return;
-    setCreatingShipment(true);
-    try {
-      const res = await fetch(`/api/admin/orders/${selectedOrder._id}/shipment`, { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Could not create the shipment");
-      toast.success(data.message || "Shipment created");
-      const c = data.shipment;
-      if (c?.awb) {
-        const tracking = { courier: c.courier || "Shiprocket", trackingNumber: c.awb, trackingUrl: c.trackingUrl || "" };
-        setTrackingForm(tracking);
-        setSelectedOrder((prev) => (prev ? { ...prev, tracking } : prev));
-      }
-      setShipInfo({ configured: true, shipment: { awb: c?.awb } });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the shipment");
-    } finally {
-      setCreatingShipment(false);
-    }
-  };
-
   const saveTracking = async () => {
     if (!selectedOrder) return;
     setSavingTracking(true);
@@ -576,17 +541,6 @@ export default function AdminOrdersPage() {
                     <input type="checkbox" checked={notifyCustomer} onChange={(e) => setNotifyCustomer(e.target.checked)} />
                     Email the customer if the tracking details changed
                   </label>
-                )}
-                {shipInfo?.configured && o.paymentStatus === "paid" && o.orderStatus !== "cancelled" && (
-                  shipInfo.shipment ? (
-                    <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                      Shiprocket shipment created{shipInfo.shipment.awb ? ` · AWB ${shipInfo.shipment.awb}` : ""}
-                    </p>
-                  ) : (
-                    <Button size="sm" variant="wellness" onClick={createShipment} disabled={creatingShipment} className="w-full">
-                      {creatingShipment ? "Creating shipment..." : "Create Shiprocket shipment"}
-                    </Button>
-                  )
                 )}
                 <Button size="sm" variant="outline" onClick={saveTracking} disabled={savingTracking} className="w-full">
                   {savingTracking ? "Saving..." : "Save tracking"}
